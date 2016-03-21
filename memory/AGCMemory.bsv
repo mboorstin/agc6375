@@ -1,18 +1,12 @@
 import BRAM::*;
 import Vector::*;
 
+import Ehr::*;
+import Fifo::*;
+import MemAndRegWrapper::*;
 import MemInit::*;
 import MemTypes::*;
 import Types::*;
-
-// Although RWMemAddr and ROMemAddr are both
-// MemAddr's, it's nice for error checking to
-// be able to tell them apart
-typedef union tagged {
-    Bit#(LNRegs) RegNum;
-    MemAddr RWMemAddr;
-    MemAddr ROMemAddr;
-} RealMemAddr deriving(Eq, Bits, FShow);
 
 typedef 8 EBanks;
 typedef TLog#(EBanks) LEBanks;
@@ -24,24 +18,24 @@ typedef TLog#(FBanks) LFBanks;
 typedef 1024 FBankWords;
 typedef TLog#(FBankWords) LFBankWords;
 
-typedef 2048 FFWords;
-typedef TLog#(FFWords) LFFWords;
-// Real memory layout - note that we think of this
-// in 16 bit (ie, word-addresssed) rather than in
-// 32 bit (ie, dword-addressed) terms
+// Real memory layout
 typedef TMul#(EBanks, EBankWords) FBankStart;
-typedef TAdd#(FBankStart, TMul#(FBanks, FBankWords)) FFStart;
 
 (* synthesize *)
+// This is basically an MMU
 module mkAGCMemory(AGCMemory);
-    // Main state: BRAM and regfile
+    // Main state: BRAM and regFile
     // TODO: Should probably allow passing in the BRAM instead of creating it here
     BRAM_Configure cfg = defaultValue;
-    BRAM2PortBE#(DMemAddr, DoubleWord, TDiv#(DoubleWordSz, 8)) bram <- mkBRAM2ServerBE(cfg);
+    BRAM2Port#(MemAddr, Word) bram <- mkBRAM2Server(cfg);
     MemInitIfc memInit <- mkMemInitBRAM(bram);
 
-    Vector#(NRegs, Reg#(Word)) regs <- replicateM(mkRegU);
+    Vector#(NRegs, Ehr#(3, Word)) regFile <- replicateM(mkEhr(0));
     Reg#(Bool) superbnk <- mkReg(False);
+
+    // HACK: Write ports need to be first to keep pipeline FIFO's happy, and we know iMemWrapper is never going to be used to write
+    MemAndRegWrapper iMemWrapper <- mkMemAndRegWrapper(bram.portA, regFile, 0, 0);
+    MemAndRegWrapper dMemWrapper <- mkMemAndRegWrapper(bram.portB, regFile, 2, 0);
 
     // Convert an AGC4 12-bit memory address to either a register
     // number or a 16-bit internal MemAddr;
@@ -54,82 +48,84 @@ module mkAGCMemory(AGCMemory);
             // Goes directly to one of the lower 3 E banks
             // Note that we've already intercepted the registers
             // at the bottom of E0
-            return tagged RWMemAddr zeroExtend(addr);
+            return tagged MemAddr zeroExtend(addr);
         end else if (addr <= 'O1777) begin
             // Switched erasable
-            Bit#(LEBanks) ebank = truncate(regs[rEB] >> 8);
+            Bit#(LEBanks) ebank = truncate(iMemWrapper.readRegImm(rEB) >> 9);
             Bit#(LEBankWords) addrInBank = truncate(addr);
             // Intercept the registers at the bottom of E0, otherwise
             // use the appropriate bank
             if ((ebank == 0) && (addrInBank < fromInteger(valueOf(NRegs)))) begin
                 return tagged RegNum truncate(addrInBank);
             end else begin
-                return tagged RWMemAddr zeroExtend({ebank, addrInBank});
+                return tagged MemAddr zeroExtend({ebank, addrInBank});
             end
-        end else if (addr <= 'O3777) begin
-            // Common fixed
-            Bit#(LFBanks) fbank = truncate(regs[rFB] >> 10);
-            Bit#(LFBankWords) addrInBank = truncate(addr);
-            // Lower banks are directly accessible via FB; upper ones
-            // are switched via the FEB bit.
-            if ((fbank >= 24) && superbnk) begin
-                fbank = fbank + 8;
-                // Banks 36 - 39 didn't physicall exist - we don't implement them
-                //if (fbank >= 36) begin
-                //    $display("Error - attempted to access nonexistent fixed bank %d", fbank);
-                //    $finish();
-                //end
-            end
-            return tagged ROMemAddr zeroExtend(fromInteger(valueOf(FBankStart)) + {fbank, addrInBank});
         end else begin
-            // Fixed fixed - goes up to 4'O7777 = 2^12 - 1
-            Bit#(LFFWords) ffAddr = truncate(addr);
-            return tagged ROMemAddr zeroExtend(fromInteger(valueOf(FFStart)) + ffAddr);
+            // Switched fixed and fixed - fixed.
+            Bit#(LFBanks) fbank;
+            Bit#(LFBankWords) addrInBank = truncate(addr);
+            // Switched fixed
+            if (addr <= 'O3777) begin
+                fbank = truncateLSB(iMemWrapper.readRegImm(rFB));
+                // Lower banks are directly accessible via FB; upper ones
+                // are switched via the FEB bit.
+                if ((fbank >= 24) && superbnk) begin
+                    fbank = fbank + 8;
+                    // Banks 36 - 39 didn't physically exist - we don't implement them
+                    // TODO: HAVE A WARNING HERE!
+                end
+            end else if (addr <= 'O5777) begin
+                // Lower half of fixed-fixed: really fixed bank 02
+                fbank = 2;
+            end else begin
+                // Upper half of fixed-fixed: really fixed bank 03
+                fbank = 3;
+            end
+            return tagged MemAddr zeroExtend(fromInteger(valueOf(FBankStart)) + {fbank, addrInBank});
         end
     endfunction
 
     interface IMemory imem;
-        method Action req(Addr addr);
-
+        method Action req(Addr addr) if (memInit.done);
+            iMemWrapper.readMem(toRealAddr(addr));
         endmethod
 
-        method ActionValue#(Instruction) resp();
-            return ?;
+        method ActionValue#(Instruction) resp() if (memInit.done);
+            Instruction ret <- iMemWrapper.memResp();
+            return ret;
         endmethod
-
-        interface MemInitIfc init = memInit;
     endinterface
 
     interface DMemoryFetcher fetcher;
-        method Action memReq(Addr addr);
-
+        method Action memReq(Addr addr) if (memInit.done);
+            dMemWrapper.readMem(toRealAddr(addr));
         endmethod
 
-        method Action regReq(Addr addr);
-
+        method Action regReq(RegIdx idx) if (memInit.done);
+            dMemWrapper.readReg(idx);
         endmethod
 
-        method ActionValue#(DoubleWord) memResp();
-            return ?;
+        method ActionValue#(Word) memResp() if (memInit.done);
+            Instruction ret <- dMemWrapper.memResp();
+            return ret;
         endmethod
 
-        method ActionValue#(DoubleWord) regResp();
-            return ?;
+        method ActionValue#(Word) regResp() if (memInit.done);
+            Instruction ret <- dMemWrapper.regResp();
+            return ret;
         endmethod
-
-        interface MemInitIfc init = memInit;
     endinterface
 
     interface DMemoryStorer storer;
-        method Action memStore(Addr addr, DoubleWord data, Bool isDouble);
-
+        method Action memStore(Addr addr, Word data) if (memInit.done);
+            dMemWrapper.writeMem(toRealAddr(addr), data);
         endmethod
 
-        method Action regStore(Addr addr, DoubleWord data, Bool isDouble);
-
+        method Action regStore(RegIdx idx, Word data) if (memInit.done);
+            dMemWrapper.writeReg(idx, data);
         endmethod
-
-        interface MemInitIfc init = memInit;
     endinterface
+
+    interface MemInitIfc init = memInit;
 
 endmodule
