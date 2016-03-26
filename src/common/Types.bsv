@@ -1,9 +1,55 @@
+import GetPut::*;
+
 typedef 12 AddrSz;
 typedef Bit#(AddrSz) Addr;
 
 typedef 16 WordSz;
 typedef Bit#(WordSz) Word;
 typedef Word Instruction;
+
+typedef 8 IOChannelSize;
+typedef Bit#(IOChannelSize) IOChannel;
+
+typedef struct {
+    IOChannel channel;
+    Word data;
+} IOPacket deriving (Eq, Bits, FShow);
+
+// Annoyingly all of the MemInit stuff has to be here so that it can
+// be used in interface AGC
+// Internally we use a 16-bit BRAM to store data, since the 12 bit
+// address space can actually address 16 bits with switched banks.
+typedef 16 MemAddrSz;
+typedef Bit#(MemAddrSz) MemAddr;
+
+typedef struct {
+    MemAddr addr;
+    Word data;
+} MemInitLoad deriving(Eq, Bits, FShow);
+
+typedef union tagged {
+    MemInitLoad InitLoad;
+    void InitDone;
+} MemInit deriving(Eq, Bits, FShow);
+
+interface MemInitIfc;
+    interface Put#(MemInit) request;
+    method Bool done();
+endinterface
+
+interface AGC;
+    // I/O send (ie, WRITE)
+    method ActionValue#(IOPacket) ioAGCToHost;
+    // I/O receive (ie, READ)
+    method Action ioHostToAGC(IOPacket packet);
+    // Start the simulation
+    // Can maybe replace this with an ioHostToAGC call,
+    // or hardcode where it's actually support to start and have
+    // memInit finished trigger it?
+    method Action start(Addr startZ);
+    // Memory initialization
+    interface MemInitIfc memInit;
+endinterface
 
 typedef 49 NRegs;
 typedef TLog#(NRegs) LNRegs;

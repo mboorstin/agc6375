@@ -1,6 +1,7 @@
 import BRAM::*;
 import Vector::*;
 
+import TopLevelIfaces::*;
 import Ehr::*;
 import Fifo::*;
 import MemAndRegWrapper::*;

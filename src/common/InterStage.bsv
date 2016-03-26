@@ -1,3 +1,5 @@
+import Types::*;
+
 typedef struct {
     Addr z;
 } Fetch2Decode deriving (Eq, Bits);
