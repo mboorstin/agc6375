@@ -40,37 +40,42 @@ int initMem(char* programPath, InportProxyT<MemInit>* memInit) {
     MemInit initMessage;
     initMessage.the_tag = MemInit::tag_InitLoad;
 
-    FILE *program = fopen(programPath, "rb");
-    if (!program) {
-        fprintf(stderr, "Error opening AGC binary!\n");
-        return 1;
-    }
-
-    // We want to fill in memory banks 2, 3, 0, 1, 4, 5, 6, ...
-    for (int i = FIXED_MEM_BANK_2; i < FIXED_MEM_BANK_TOP; i++) {
-        if (fread(readBuf, 2, 1, program) != 1) {
-            fprintf(stderr, "Error reading AGC binary when addr was %d\n", i);
+    if (programPath) {
+        FILE *program = fopen(programPath, "rb");
+        if (!program) {
+            fprintf(stderr, "Error opening AGC binary!\n");
             return 1;
         }
 
-        initMessage.m_InitLoad.m_addr = i;
-        // Note that the binary file is bigendian.
-        initMessage.m_InitLoad.m_data = (readBuf[0] << 8) + readBuf[1];
-        if (i % 1024 == 0) {
-            printf("Sending addr %d\n", i);
-        }
-        memInit->sendMessage(initMessage);
+        // We want to fill in memory banks 2, 3, 0, 1, 4, 5, 6, ...
+        for (int i = FIXED_MEM_BANK_2; i < FIXED_MEM_BANK_TOP; i++) {
+            if (fread(readBuf, 2, 1, program) != 1) {
+                fprintf(stderr, "Error reading AGC binary when addr was %d\n", i);
+                return 1;
+            }
 
-        // Handle the memory bank pattern above.
-        if (i == (FIXED_MEM_BANK_4 - 1)) {
-            i = FIXED_MEM_START - 1;
+            initMessage.m_InitLoad.m_addr = i;
+            // Note that the binary file is bigendian.
+            initMessage.m_InitLoad.m_data = (readBuf[0] << 8) + readBuf[1];
+            if (i % 1024 == 0) {
+                printf("Sending addr %d\n", i);
+            }
+            memInit->sendMessage(initMessage);
+
+            // Handle the memory bank pattern above.
+            if (i == (FIXED_MEM_BANK_4 - 1)) {
+                i = FIXED_MEM_START - 1;
+            }
+            else if (i == (FIXED_MEM_BANK_2 - 1)) {
+                i = FIXED_MEM_BANK_4 - 1;
+            }
         }
-        else if (i == (FIXED_MEM_BANK_2 - 1)) {
-            i = FIXED_MEM_BANK_4 - 1;
-        }
+
+        printf("Finished sending data, sending InitDone\n");
     }
-
-    printf("Finished sending data, sending InitDone\n");
+    else {
+        printf("Not sending any data!\n");
+    }
 
     initMessage.the_tag = MemInit::tag_InitDone;
     memInit->sendMessage(initMessage);
@@ -190,9 +195,16 @@ void exitCleanly(ShutdownXactor* shutdown, SceMiServiceThread* scemiServiceThrea
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 2) {
-        fprintf(stderr, "Usage: ./procToDSKY TARGET_PROGRAM_PATH\n");
+    const char* usageString = "Usage: ./procToDSKY [TARGET_PROGRAM_PATH]\n";
+
+    if (argc >= 3) {
+        fprintf(stderr, "%s", usageString);
         exit(1);
+    }
+
+    if (argc == 2 && ((strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0))){
+        printf("%s", usageString);
+        exit(0);
     }
 
     printf("Starting up!\n");
@@ -217,7 +229,7 @@ int main(int argc, char* argv[]) {
     reset.reset();
 
     // Initialize the FPGA memory
-    if (initMem(argv[1], &memInit) != 0) {
+    if (initMem((argc == 2) ? argv[1] : NULL, &memInit) != 0) {
         exitCleanly(&shutdown, scemiServiceThread, sceMi, 0, 1);
     }
 
