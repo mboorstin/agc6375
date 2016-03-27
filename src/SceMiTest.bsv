@@ -9,8 +9,20 @@ module mkAGC(AGC);
     Reg#(Bool) started <- mkReg(False);
     Reg#(Bool) lightOn <- mkReg(False);
     Reg#(Bool) sendMessage <- mkReg(False);
+    Reg#(Bool) requestMade <- mkReg(False);
 
+    // Memory initialization test: should print out C020
+    rule makeRequest (!requestMade);
+        memory.imem.req('O4032);
+        requestMade <= True;
+    endrule
 
+    rule dispResp (requestMade);
+        let inst <- memory.imem.resp();
+        $display("Result from 'O4032: %x", inst);
+    endrule
+
+    // Test I/O ports
     // Should dequeue from a FIFO of requests or something like that
     method ActionValue#(IOPacket) ioAGCToHost if (started && sendMessage);
         $display("Sending packet");
