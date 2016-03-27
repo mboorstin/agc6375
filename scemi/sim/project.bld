@@ -30,9 +30,15 @@ scemi-tcp-port:             19796
 create-workstation-project: true
 post-targets:               procToDSKY
 
+[scemitest]
+extends-target:           agc_common
+bsv-define:               AGC_FILE=SceMiTest SIM
+workstation-project-file: build/scemitest.bspec
+exe-file:                 build/bin/scemiTestSim
+
 [fourcycle]
 extends-target:           agc_common
-bsv-define:               AGC_FILE=FourCycle
+bsv-define:               AGC_FILE=FourCycle SIM
 workstation-project-file: build/fourcycle.bspec
 exe-file:                 build/bin/fourcycleSim
 

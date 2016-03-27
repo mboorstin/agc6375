@@ -26,8 +26,12 @@ typedef TMul#(EBanks, EBankWords) FBankStart;
 // This is basically an MMU
 module mkAGCMemory(AGCMemory);
     // Main state: BRAM and regFile
-    // TODO: Should probably allow passing in the BRAM instead of creating it here
     BRAM_Configure cfg = defaultValue;
+    // Load a VMH in simulation so we don't have to transfer it over SceMi
+    `ifdef SIM
+        cfg.loadFormat = Hex("program.vmh");
+    `endif
+
     BRAM2Port#(MemAddr, Word) bram <- mkBRAM2Server(cfg);
     MemInitIfc memInit <- mkMemInitBRAM(bram);
 

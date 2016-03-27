@@ -7,26 +7,18 @@ import Types::*;
 module mkAGC(AGC);
     AGCMemory memory <- mkAGCMemory();
     Reg#(Bool) started <- mkReg(False);
-    Reg#(Bool) lightOn <- mkReg(False);
-    Reg#(Bool) sendMessage <- mkReg(False);
-
 
     // Should dequeue from a FIFO of requests or something like that
-    method ActionValue#(IOPacket) ioAGCToHost if (started && sendMessage);
-        $display("Sending packet");
-        sendMessage <= False;
-        return IOPacket{channel: 'O11, data: (lightOn ? 'hFFFF : 0)};
+    // For now, guarding so that it doesn't constantly run
+    method ActionValue#(IOPacket) ioAGCToHost if (False);
+        return ?;
     endmethod
 
-    method Action ioHostToAGC(IOPacket packet);
-        $display("Packet received: channel %x, data %x", packet.channel, packet.data);
-        sendMessage <= True;
-        lightOn <= !lightOn;
+    method Action ioHostToAGC(IOPacket packet) if (started);
+
     endmethod
 
-    // Should probably slap some guards on this (memory.isInit?)
-    method Action start(Addr startZ);
-        $display("Start received with address %x", startZ);
+    method Action start(Addr startZ) if (memory.init.done);
         started <= True;
     endmethod
 
