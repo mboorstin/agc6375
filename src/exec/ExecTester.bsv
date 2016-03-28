@@ -8,7 +8,7 @@ module mkExecTest ();
 
 
     //module to test
-    Exec exec <- mkExec();
+    //Exec exec <- mkExec();
 
     //test inputs
     Decode2Exec d2e;

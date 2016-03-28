@@ -1,43 +1,33 @@
 import InterStage::*;
 import Types::*;
-import Vector::*;
-import GetPut::*;
+import ArithUtil::*;
 
-typedef Server#(
-    Decode2Exec,
-    Exec2Writeback
-) Exec;
-
-(* synthesize *)
-module mkExec(Exec);
-    //fifos
-    Fifo#(2, Decode2Exec) inputFIFO <- mkConflictFifo();
-    Fifo#(2, Exec2Writeback) outputFIFO <- mkConflictFifo();
-
-    //flags
-    Reg#(Bool) extracode <- mkReg#(False);
-    Reg#(Instruction) prev_inst <- mkRegU;
-
+(* noinline *)
+function Exec2Writeback Exec(Decode2Exec d2e, AGCMemory memory);
     //exec
-    rule exec();
-        //pull data from decode
-	Decode2Exec d2e = inputFIFO.first;
-	inputFIFO.deq;
 
-	Bit#(3) ccc = d2e.inst[15:13];
-	Bit#(12) addr = d2e.inst[12:0];
-	Bit#(2) qq = d2e.inst[12:11];
-	Bit#(3) ppp = d2e.inst[12:10];
+    //receive from memory if necessary
+    Word mem_resp;
+    Word reg_resp;
+    if (d2e.deqFromMem) mem_resp <- memory.fetcher.memResp();
+    if (d2e.deqFromReg) reg_resp <- memory.fetcher.regResp();
 
-	Word eRes1;
-	Word eRes2;
-	Maybe#(Addr) memAddr;
-	Maybe#(RegIdz) regNum;
-	Maybe#(Addr) newZ;
+    //pulling data out of inst
+    Bit#(3) ccc = d2e.inst[15:13]; //primary opcode values
+    Bit#(12) addr = d2e.inst[12:0]; //all bits that may contain address info
+    Bit#(2) qq = d2e.inst[12:11]; //secondary opcode values (qc values)
+    Bit#(3) ppp = d2e.inst[12:10]; //secondary opcode values for IO instructions (pc values)
+
+    //values to pass to writeback
+    Word eRes1;
+    Word eRes2;
+    Maybe#(Addr) memAddr;
+    Maybe#(RegIdz) regNum;
+    Maybe#(Addr) newZ;
 
 	//maybe there's a better way to set this up?  Either way, I'm so sorry.
 	//extracode
-	if (extracode) begin
+	if (d2e.isExtended) begin
 	    //
 	    case(ccc)
 		opIO: begin //corresponds to I/O instructions
@@ -114,7 +104,7 @@ module mkExec(Exec);
 	        end
 	    endcase
 	end 
-	else begin //otherwise
+	else begin //not extracode
             case (aaa)
                 opTC: begin //TC
 		    //
@@ -166,7 +156,9 @@ module mkExec(Exec);
 		    endcase
 		end
 		opAD: begin //AD
-		    //
+		    //adds the contents of a memory location into the accumulator (rA)
+		    //will in the future set the overflow flag.
+		    if 
 		end
 		opMASK: begin //MASK
 		    //
@@ -174,24 +166,15 @@ module mkExec(Exec);
 	    endcase
 	end
 
-	//encoding output
-	Exec2Writeback e2w = Exec2Writeback{
-	    eRes1:eRes1,
-	    eRes2:eRes2,
-	    memAddr:memAddr,
-	    regNum:regNum,
-	    newZ:newZ,
-	};
-	outputFIFO.enq(e2w);
-    endrule
+    //encoding output
+    Exec2Writeback e2w = Exec2Writeback{
+	eRes1:eRes1,
+	eRes2:eRes2,
+	memAddr:memAddr,
+	regNum:regNum,
+	newZ:newZ,
+    };
+    return e2w;
 
-    //get put
-    interface Put request;
-        method Action put(Decode2Exec x);
-            inputFIFO.enq(x);
-	endmethod
-    endinterface
-    interface get response = toGet(outputFIFO);
-
-endmodule
+endfunction
 
