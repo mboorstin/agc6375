@@ -13,10 +13,18 @@ typedef struct {
 } Decode2Exec deriving (Eq, Bits);
 
 typedef struct {
-    Word eRes1;
-    Word eRes2;
+    Addr z;
+    Instruction inst;
+    Bool isExtended;
+    Maybe#(Word) memResp; //corresponds to deqFromMem
+    Maybe#(Word) regResp; //corresponds to deqFromReg
+} ExecFuncArgs deriving (Eq, Bits, FShow);
+
+typedef struct {
+    Word eRes1; //corresponds to memAddr
+    Word eRes2; //corresponds to regNum
     Maybe#(Addr) memAddr;
     Maybe#(RegIdx) regNum;
     // Should only be used for TS instruction
     Maybe#(Addr) newZ;
-} Exec2Writeback deriving (Eq, Bits);
+} Exec2Writeback deriving (Eq, Bits, FShow);

@@ -108,6 +108,16 @@ RegIdx rLEMONNM = 46;
 RegIdx rOUTLINK = 47;
 RegIdx rALTM = 48;
 
+// Bluespec doesn't have overloaded functions, and for whatever reason
+// doesn't like the parameterized version on Bit#(n) :-()
+function Bool is16BitReg(RegIdx r);
+    return (r == rA) || (r == rL) || (r== rQ);
+endfunction
+
+function Bool is16BitRegM(Addr a);
+    return (a[11:2] == 0) && is16BitReg(truncate(a));
+endfunction
+
 // Opcodes
 typedef Bit#(3) Opcode;
 // Non-extended
