@@ -107,3 +107,80 @@ RegIdx rTHURST = 45;
 RegIdx rLEMONNM = 46;
 RegIdx rOUTLINK = 47;
 RegIdx rALTM = 48;
+
+// Opcodes
+typedef Bit#(3) Opcode;
+// Non-extended
+Opcode opTC = 0;
+Opcode opCCS = 1;
+Opcode opTCF = 1;
+Opcode opDAS = 2;
+Opcode opLXCH = 2;
+Opcode opINCR = 2;
+Opcode opADS = 2;
+Opcode opCA = 3;
+Opcode opCS = 4;
+Opcode opINDEX = 5;
+Opcode opDXCH = 5;
+Opcode opTS = 5;
+Opcode opXCH = 5;
+Opcode opAD = 6;
+Opcode opMASK = 7;
+// Extended
+// Not an actual opcode name but matches all I/O channel opcodes
+Opcode opIO = 0;
+Opcode opDV = 1;
+Opcode opBZF = 1;
+Opcode opMSU = 2;
+Opcode opQXCH = 2;
+Opcode opAUG = 2;
+Opcode opDIM = 2;
+Opcode opDCA = 3;
+Opcode opDCS = 4;
+// opINDEX already exists
+Opcode opSU = 6;
+Opcode opBZMF = 6;
+Opcode opMP = 7;
+
+// Quartercodes!  These are only defined when necessary
+// In particular, if an instruction is "anything but 0", it's not
+// given a quartercode, as presumably the corresponding 0 code will
+// be matched against
+typedef Bit#(2) QC;
+// Non-extended
+// Opcode 0
+QC qcCCS = 0;
+// TCF is anything but 0
+// Opcode 1
+QC qcDAS = 0;
+QC qcLXCH = 1;
+QC qcINCR = 2;
+QC qcADS = 3;
+// Opcode 5
+QC qcINDEX = 0;
+QC qcDXCH = 1;
+QC qcTS = 2;
+QC qcXCH = 3;
+// Extended
+// Opcode 0 is I/O and is three bits: has its own QCIO codes below
+// Opcode 1
+QC qcDV = 0;
+// BZF is anything but 0
+// Opcode 2
+QC qcMSU = 0;
+QC qcQXCH = 1;
+QC qcAUG = 2;
+QC qcDIM = 3;
+// Opcode 6
+QC qcSU = 0;
+// BZMF is anything but 0
+
+typedef Bit#(3) QCIO;
+QCIO qcioREAD = 0;
+QCIO qcioWRITE = 1;
+QCIO qcioRAND = 2;
+QCIO qcioWAND = 3;
+QCIO qcioROR = 4;
+QCIO qcioWOR = 5;
+QCIO qcioRXOR = 6;
+QCIO qcioEDRUPT = 7;
