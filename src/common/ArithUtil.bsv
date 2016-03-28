@@ -1,7 +1,13 @@
 import Types::*;
 
+//TODO: test all.
 
-//functions for ones complement arithmetic.
+//single and double precision integers
+typedef Bit#(15) SP;
+typedef Bit#(30) DP;
+
+
+//functions for ones complement arithmetic
 
 //addition.
 //overflow could be an issue.
@@ -21,3 +27,48 @@ function Bit#(n) addOnes (Bit#(n) a, Bit#(n) b);
     return sum;
 
 endfunction
+
+//subtraction.
+//a - b is returned.
+function Bit#(n) subOnes (Bit#(n) a, Bit#(n) b);
+    //invert b, add.
+    return addOnes(a, ~b);
+endfunction
+
+
+//functions for converting SP/DP values and performing arithmetic with them
+function SP addSP (SP a, SP b);
+    return addOnes(a, b);
+endfunction
+
+function DP addDP(DP a, DP b);
+    //TODO
+endfunction
+
+//sometimes DP values can have inconsistent signs.  The output of this function will have consistent signs.
+function DP makeConsistentSign(DP a);
+    DP out;
+
+    if (a[29] != a[14]) begin //if not currently consistent
+        SP high = a[29:15];
+	SP low = a[14:0];
+	
+	SP new_high;
+	SP new_low;
+
+	if (a[29] == 1) begin //if larger portion is negative
+            new_high = addOnes(high, fromInteger(1)); //move amount from smaller SP to larger SP
+	    new_low = subOnes(low, 15'b0_100_000_000_000_000);
+	end
+	else begin //otherwise
+            new_high = subOnes(high, fromInteger(1)); //move amount from larger SP to smaller SP
+	    new_low = addOnes(low, 15'b0_100_000_000_000_000);
+	end
+	out = {new_high, new_low}; //new value (should be equivalent to old value)
+    end
+    else begin
+        out = a;
+    end
+    return out;
+endfunction
+
