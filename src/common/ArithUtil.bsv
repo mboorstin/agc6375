@@ -14,16 +14,16 @@ typedef Bit#(30) DP;
 //As in the original AGC, (-1) + (+1) = (-0)
 function Bit#(n) addOnes (Bit#(n) a, Bit#(n) b);
     //
-    Bit#(n+1) sum_u = {0, a[n-1:0]} + b[n-1:0];
+    Bit#(TAdd#(n,1)) sum_u = {1'b0, a} + {1'b0, b};
     Bit#(n) sum;
-    if (sum_u[n] == 1) begin //if the carry bit overflows to the left
+    Bit#(1) msb = truncateLSB(sum_u);
+    if (msb == 1) begin //if the carry bit overflows to the left
         //wrap it back around to the right.
-	sum_u = sum_u[n-1:0] + 1;
-	sum = sum_u[n-1:0];
+        sum_u = sum_u + 1;
     end
     
     //return truncated sum.
-    sum = sum_u[n-1:0];
+    sum = truncate(sum_u);
     return sum;
 
 endfunction
@@ -35,6 +35,14 @@ function Bit#(n) subOnes (Bit#(n) a, Bit#(n) b);
     return addOnes(a, ~b);
 endfunction
 
+//multiplication
+//a * b is returned.
+//functions by converting to 2's complement and multiplying.
+//
+/*functions Bit#(n) multOnes (Bit#(n) a, Bit#(n) b);
+    Bit#(TAdd#(n,1)) a_twos = {a[TSub#(n,1)],a};
+endfunction*/
+
 
 //functions for converting SP/DP values and performing arithmetic with them
 function SP addSP (SP a, SP b);
@@ -43,6 +51,7 @@ endfunction
 
 function DP addDP(DP a, DP b);
     //TODO
+    return a;
 endfunction
 
 //sometimes DP values can have inconsistent signs.  The output of this function will have consistent signs.
