@@ -18,7 +18,7 @@ typedef struct {
     Bool isExtended;
     Maybe#(Word) memResp; //corresponds to deqFromMem
     Maybe#(Word) regResp; //corresponds to deqFromReg
-} ExecFuncArgs deriving (Eq, Bits);
+} ExecFuncArgs deriving (Eq, Bits, FShow);
 
 typedef struct {
     Word eRes1; //corresponds to memAddr

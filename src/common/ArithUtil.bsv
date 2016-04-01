@@ -21,7 +21,7 @@ function Bit#(n) addOnes (Bit#(n) a, Bit#(n) b);
         //wrap it back around to the right.
         sum_u = sum_u + 1;
     end
-    
+
     //return truncated sum.
     sum = truncate(sum_u);
     return sum;
@@ -61,7 +61,7 @@ function DP makeConsistentSign(DP a);
     if (a[29] != a[14]) begin //if not currently consistent
         SP high = a[29:15];
 	SP low = a[14:0];
-	
+
 	SP new_high;
 	SP new_low;
 
@@ -80,4 +80,3 @@ function DP makeConsistentSign(DP a);
     end
     return out;
 endfunction
-

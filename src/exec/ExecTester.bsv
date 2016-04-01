@@ -1,63 +1,139 @@
+import FShow::*;
 import GetPut::*;
-import InterStage::*;
-import Exec::*;
-import Types::*;
 import Vector::*;
-import AGCMemory::*;
+
+import Exec::*;
+import InterStage::*;
+import Types::*;
+
+typedef 6 NTESTS;
+
+typedef struct {
+    ExecFuncArgs args;
+    Exec2Writeback expected;
+} TestData deriving (Eq, Bits, FShow);
 
 (* synthesize *)
 module mkExecTest ();
-    //state
-    Reg#(Bool) started <- mkReg(False);
-    Reg#(Bool) memready <- mkReg(False);
     Reg#(Bool) done <- mkReg(False);
-    //AGCMemory memory <- mkAGCMemory();
 
-    //test inputs
-    Vector#(10, ExecFuncArgs) in = newVector;
-    Bit#(16) mem_val = {15'h0240, 1'b0};
-    in[0] = ExecFuncArgs{
-    	z:12'b0,
-        inst:{opAD, 12'h010, 1'b0},
-        isExtended:False,
-        memResp:tagged Valid mem_val,
-        regResp:tagged Valid 16'h0134
+    Vector#(NTESTS, TestData) in = newVector;
+    Bit#(16) memVal = {15'h0240, 1'b0};
+    in[0] = TestData{
+        args: ExecFuncArgs{
+            z:12'b0,
+            inst:{opAD, 12'h010, 1'b0},
+            isExtended:False,
+            memResp:tagged Valid memVal,
+            regResp:tagged Valid 16'h0134
+        },
+        expected: Exec2Writeback {
+            eRes1: ?,
+            eRes2: ?,
+            memAddr: ?,
+            regNum: ?,
+            newZ: tagged Invalid
+        }
     };
-    in[1] = ExecFuncArgs{
-    	z:12'b0,
-        inst:{opADS, qcADS, 10'h010, 1'b0},
-        isExtended:False,
-        memResp:tagged Valid mem_val,
-        regResp:tagged Valid 16'h0154
+
+    in[1] = TestData{
+        args: ExecFuncArgs{
+            z:12'b0,
+            inst:{opADS, qcADS, 10'h010, 1'b0},
+            isExtended:False,
+            memResp:tagged Valid memVal,
+            regResp:tagged Valid 16'h0154
+        },
+        expected: Exec2Writeback {
+            eRes1: ?,
+            eRes2: ?,
+            memAddr: ?,
+            regNum: ?,
+            newZ: tagged Invalid
+        }
     };
-    /*in[2] = {};
-    in[3] = {};
-    in[4] = {};
-    in[5] = {};
-    in[6] = {};
-    in[7] = {};
-    in[8] = {};
-    in[9] = {};*/
 
+    in[2] = TestData {
+        args: ExecFuncArgs {
+            z: 12'b0,
+            inst: {opAUG, qcAUG, 10'h80, 1'b0},
+            isExtended: True,
+            memResp: tagged Valid memVal,
+            regResp: tagged Invalid
+        },
+        expected: Exec2Writeback {
+            eRes1: {15'h0241, 1'b0},
+            eRes2: 0,
+            memAddr: tagged Valid 'h80,
+            regNum: tagged Invalid,
+            newZ: tagged Invalid
+        }
+    };
 
-    //starting up
-    rule init(!started);
-        started <= True;
-        //memory.init.request.put(tagged InitDone);
-    endrule
+    in[3] = TestData {
+        args: ExecFuncArgs {
+            z: 12'b0,
+            inst: {opBZF, 'O2000, 1'b0},
+            isExtended: True,
+            memResp: tagged Invalid,
+            regResp: tagged Valid 0
+        },
+        expected: Exec2Writeback {
+            eRes1: 0,
+            eRes2: 0,
+            memAddr: tagged Invalid,
+            regNum: tagged Invalid,
+            newZ: tagged Valid 'O2000
+        }
+    };
 
-    rule prepare_memory(started && !memready);
-        //
-        //memory.storer.regStore(rA, 16'o0000);
-        //memory.storer.memStore(12'd0100, 16'o0143);
-        memready <= True;
-    endrule
-    
-    rule one_in (memready && !done);
+    in[4] = TestData {
+        args: ExecFuncArgs {
+            z: 12'b0,
+            inst: {opBZMF, 'O2000, 1'b0},
+            isExtended: True,
+            memResp: tagged Invalid,
+            regResp: tagged Valid 'hC000
+        },
+        expected: Exec2Writeback {
+            eRes1: 0,
+            eRes2: 0,
+            memAddr: tagged Invalid,
+            regNum: tagged Invalid,
+            newZ: tagged Valid 'O2000
+        }
+    };
+
+    in[5] = TestData {
+        args: ExecFuncArgs {
+            z: 12'b0,
+            inst: {opCA, 'O2000, 1'b0},
+            isExtended: False,
+            memResp: tagged Valid 'hBEEE,
+            regResp: tagged Invalid
+        },
+        expected: Exec2Writeback {
+            eRes1: 0,
+            eRes2: 'hDF77,
+            memAddr: tagged Invalid,
+            regNum: tagged Valid 0,
+            newZ: tagged Invalid
+        }
+    };
+
+    // We're just testing a bunch of combinational logic, so we can
+    // do a single massive rule
+    rule doTest (!done);
         //send in data
-        for (Integer i = 0; i < 2; i = i + 1) begin
-            Exec2Writeback result = exec(in[i]);
-            $display(fshow(result));
+        for (Integer i = 0; i < valueOf(NTESTS); i = i + 1) begin
+            Exec2Writeback result = exec(in[i].args);
+            if (result != in[i].expected) begin
+                $display("Failed on input %d", i);
+                $display("Expect: ", fshow(in[i].expected));
+                $display("Result: ", fshow(result));
+            end else begin
+                $display("Passed input %d", i);
+            end
         end
         done <= True;
     endrule
@@ -66,6 +142,6 @@ module mkExecTest ();
     rule finish(done);
         $finish();
     endrule
-    
+
 endmodule
 
