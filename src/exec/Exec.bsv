@@ -74,7 +74,7 @@ function Exec2Writeback exec(ExecFuncArgs args);
                         return aug(args);
                     end
                     qcDIM: begin //DIM
-                        return ?;
+                        return dim(args);
                     end
                 endcase
             end
@@ -119,10 +119,10 @@ function Exec2Writeback exec(ExecFuncArgs args);
                         return ?;
                     end
                     qcLXCH: begin //LXCH
-                        return ?;
+                        return lxch(args);
                     end
                     qcINCR: begin //INCR
-                        return ?;
+                        return incr(args);
                     end
                     qcADS: begin //ADS
                         return ads(args);
@@ -155,7 +155,7 @@ function Exec2Writeback exec(ExecFuncArgs args);
                 return ad(args);
             end
             opMASK: begin //MASK
-                return ?;
+                return mask(args);
             end
         endcase
     end
@@ -409,6 +409,126 @@ function Exec2Writeback cs(ExecFuncArgs args);
     return Exec2Writeback {
         eRes1: 0,
         eRes2: acc,
+        memAddr: tagged Invalid,
+        regNum: tagged Valid rA,
+        newZ: tagged Invalid
+    };
+endfunction
+
+// Diminish
+// The "Diminish" instruction decrements a positive non-zero value in an
+// erasable-memory location in-place, or increments a negative non-zero value.
+// It's difficult to get this to share hardware with AUG because of the differing
+// handling of +/- 0.  Code-wise, Bluespec doesn't allow function pointers, so it's
+// not really worth the overhead of combining aug and dim.
+// Parameterized helper function
+function Bit#(n) subOrAddNonZero(Bit#(n) val);
+    if ((val == 0) || (val == ~0)) begin
+        return val;
+    end else if (val[valueOf(TSub#(n, 1))] == 0) begin
+        return subOnes(val, 1);
+    end else begin
+        return addOnes(val, 1);
+    end
+endfunction
+
+function Exec2Writeback dim(ExecFuncArgs args);
+    Word memResp = fromMaybe(?, args.memResp);
+
+    Word dimmed;
+
+    Addr memAddr = {2'b0, args.inst[10:1]};
+
+    if (is16BitRegM(memAddr)) begin
+        dimmed = subOrAddNonZero(memResp);
+    end else begin
+        // TAGLSB
+        dimmed = {subOrAddNonZero(memResp[15:1]), 1'b0};
+    end
+
+    return Exec2Writeback {
+        eRes1: dimmed,
+        // Should be ? but setting to 0 to keep tests happy
+        eRes2: 0,
+        memAddr: tagged Valid memAddr,
+        regNum: tagged Invalid,
+        newZ: tagged Invalid
+    };
+endfunction
+
+// INCR
+// The "Increment" instruction increments an erasable-memory location in-place by +1.
+function Exec2Writeback incr(ExecFuncArgs args);
+    Word memResp = fromMaybe(?, args.memResp);
+
+    Word auged;
+
+    Addr memAddr = {2'b0, args.inst[10:1]};
+
+    if (is16BitRegM(memAddr)) begin
+        auged = addOnes(memResp, 1);
+    end else begin
+        // TAGLSB
+        auged = {addOnes(memResp[15:1], 1), 1'b0};
+    end
+
+    return Exec2Writeback {
+        eRes1: auged,
+        // Should be ? but setting to 0 to keep tests happy
+        eRes2: 0,
+        memAddr: tagged Valid memAddr,
+        regNum: tagged Invalid,
+        newZ: tagged Invalid
+    };
+endfunction
+
+// LXCH
+// The "Exchange L and K" instruction exchanges the value in the L register with a
+// value stored in erasable memory.
+function Exec2Writeback lxch(ExecFuncArgs args);
+    Word memResp = fromMaybe(?, args.memResp);
+    Word lResp = fromMaybe(?, args.regResp);
+
+    Addr memAddr = {2'b0, args.inst[10:1]};
+
+    Bool is16Bits = is16BitRegM(memAddr);
+
+    // TAGLSB
+    Word newL = is16Bits ? memResp : signExtend(memResp[15:1]);
+    // TAGEXCEPTION
+    Word newMem = is16Bits ? lResp : {lResp[14:0], 0};
+
+    return Exec2Writeback {
+        eRes1: newMem,
+        eRes2: newL,
+        memAddr: tagged Valid memAddr,
+        regNum: tagged Valid rL,
+        newZ: tagged Invalid
+    };
+endfunction
+
+// MASK
+// The "Mask A by K" instruction logically ANDs the contents of a memory
+// location bitwise into the accumulator.
+function Exec2Writeback mask(ExecFuncArgs args);
+    Word memResp = fromMaybe(?, args.memResp);
+    Word aResp = fromMaybe(?, args.regResp);
+
+    Addr memAddr = {2'b0, args.inst[10:1]};
+
+    Word newA;
+    // Hopefully the compiler figures out it can use most of these
+    // & gates for both cases...right?
+    if (is16BitRegM(memAddr)) begin
+        newA = memResp & aResp;
+    end else begin
+        // TAGEXCEPTION
+        newA = signExtend(memResp[15:1] & aResp[14:0]);
+    end
+
+    return Exec2Writeback {
+        eRes1: 0,
+        eRes2: newA,
         memAddr: tagged Invalid,
         regNum: tagged Valid rA,
         newZ: tagged Invalid

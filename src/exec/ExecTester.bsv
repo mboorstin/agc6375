@@ -6,7 +6,7 @@ import Exec::*;
 import InterStage::*;
 import Types::*;
 
-typedef 10 NTESTS;
+typedef 14 NTESTS;
 
 typedef struct {
     ExecFuncArgs args;
@@ -185,6 +185,74 @@ module mkExecTest ();
         expected: Exec2Writeback {
             eRes1: 0,
             eRes2: 'h5555,
+            memAddr: tagged Invalid,
+            regNum: tagged Valid 0,
+            newZ: tagged Invalid
+        }
+    };
+
+    in[10] = TestData {
+        args: ExecFuncArgs {
+            z: 12'b0,
+            inst: {opDIM, qcDIM, 10'h80, 1'b0},
+            isExtended: True,
+            memResp: tagged Valid memVal,
+            regResp: tagged Invalid
+        },
+        expected: Exec2Writeback {
+            eRes1: {15'h023F, 1'b0},
+            eRes2: 0,
+            memAddr: tagged Valid 'h80,
+            regNum: tagged Invalid,
+            newZ: tagged Invalid
+        }
+    };
+
+    in[11] = TestData {
+        args: ExecFuncArgs {
+            z: 12'b0,
+            inst: {opINCR, qcINCR, 10'h80, 1'b0},
+            isExtended: False,
+            memResp: tagged Valid memVal,
+            regResp: tagged Invalid
+        },
+        expected: Exec2Writeback {
+            eRes1: {15'h0241, 1'b0},
+            eRes2: 0,
+            memAddr: tagged Valid 'h80,
+            regNum: tagged Invalid,
+            newZ: tagged Invalid
+        }
+    };
+
+    in[12] = TestData {
+        args: ExecFuncArgs {
+            z: 12'b0,
+            inst: {opLXCH, qcLXCH, 10'h80, 1'b0},
+            isExtended: False,
+            memResp: tagged Valid memVal,
+            regResp: tagged Valid 'hBEEF
+        },
+        expected: Exec2Writeback {
+            eRes1: 'h7DDE,
+            eRes2: 'h0240,
+            memAddr: tagged Valid 'h80,
+            regNum: tagged Valid 1,
+            newZ: tagged Invalid
+        }
+    };
+
+    in[13] = TestData {
+        args: ExecFuncArgs {
+            z: 12'b0,
+            inst: {opMASK, 'O2000, 1'b0},
+            isExtended: False,
+            memResp: tagged Valid memVal,
+            regResp: tagged Valid 'hF0A5
+        },
+        expected: Exec2Writeback {
+            eRes1: 0,
+            eRes2: 'h0080,
             memAddr: tagged Invalid,
             regNum: tagged Valid 0,
             newZ: tagged Invalid
