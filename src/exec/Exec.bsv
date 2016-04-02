@@ -107,7 +107,7 @@ function Exec2Writeback exec(ExecFuncArgs args);
             end
             opCCS: begin //corresponds to CCS and TCF
                 if (qq == qcCCS) begin //CCS
-                    return ?;
+                    return ccs(args);
                 end
                 else begin //TCF
                     return ?;
@@ -133,7 +133,7 @@ function Exec2Writeback exec(ExecFuncArgs args);
                 return ca(args);
             end
             opCS: begin //CS
-                return ?;
+                return cs(args);
             end
             opINDEX: begin //corresponds to INDEX, DXCH, TS, XCH
                 case (qq)
@@ -329,6 +329,86 @@ function Exec2Writeback ca(ExecFuncArgs args);
     return Exec2Writeback {
         eRes1: 0,
         eRes2: newAcc,
+        memAddr: tagged Invalid,
+        regNum: tagged Valid rA,
+        newZ: tagged Invalid
+    };
+endfunction
+
+// Counct, Compare, and Skip
+// The "Count, Compare, and Skip" instruction stores a variable from erasable memory into the
+// accumulator (which is decremented), and then performs one of several jumps based on the original
+// value of the variable.  This is the only "compare" instruction in the AGC instruction set.
+function Exec2Writeback ccs(ExecFuncArgs args);
+    Word memResp = fromMaybe(?, args.memResp);
+    Addr memAddr = args.inst[12:1]; // TAGLSB
+
+    Bool is16Bits = is16BitRegM(memAddr);
+
+    // This makes two copies of the dABS logic - can we do better?
+    Word dabs;
+    if (is16Bits) begin
+        dabs = dABS(memResp);
+    end else begin
+        dabs = {dABS(memResp[15:1]), 0};
+    end
+
+    // I think this is the correct interpretation of how to handle overflow here: just
+    // ignore the fact that it exists, and treat A, L, and Q as 16 bits.  We basically treat
+    // A, L, and Q as 15 bit registers, and then correct for the 1 cases where this is wrong
+    // This could probably be made more efficient - we're choosing to do dynamic addition, but
+    // might be worth the extra space and do static addition?  Unclear.  On the other hand, the
+    // compiler can hopefully figure out that there are only 4 options for addend.
+    Addr addend;
+
+    // Note that positive numbers in 1's and 2's complement are the same
+    // Be wary of changing the order of this logic - this is written in such a way that
+    // the 16 bit value 1111111111111110 falls through to < -0, which saves us an A/L/Q fix,
+    // even though it "should" be == -0
+    // == +0
+    if (dabs[15:1] == 0) begin
+        addend = 2;
+    // == -0
+    end else if (dabs[15:1] == {1'b1, 0}) begin
+        addend = 4;
+    // > +0
+    end else if (dabs[15] == 0) begin
+        addend = 1;
+    // < -0
+    end else begin
+        addend = 3;
+    end
+
+    // Fix A, L, and Q
+    if (is16Bits && (memResp == 1)) begin
+        addend = 1;
+    end
+
+    return Exec2Writeback {
+        eRes1: 0,
+        eRes2: dabs,
+        memAddr: tagged Invalid,
+        regNum: tagged Valid rA,
+        newZ: tagged Valid addOnes(args.z, addend)
+    };
+endfunction
+
+// Clear and Subtract
+// The "Clear and Subtract" instruction moves the 1's-complement (i.e., the negative) of a memory location into
+// the accumulator.
+function Exec2Writeback cs(ExecFuncArgs args);
+    Word memResp = fromMaybe(?, args.memResp);
+    Addr memAddr = args.inst[12:1]; // TAGLSB
+
+    Bit#(15) upper = ~memResp[15:1];
+
+    Bool is16Bits = is16BitRegM(memAddr);
+
+    Word acc = is16BitRegM(memAddr) ? {upper, ~memResp[0]} : signExtend(upper);
+
+    return Exec2Writeback {
+        eRes1: 0,
+        eRes2: acc,
         memAddr: tagged Invalid,
         regNum: tagged Valid rA,
         newZ: tagged Invalid

@@ -18,7 +18,7 @@ function Bit#(n) addOnes (Bit#(n) a, Bit#(n) b);
 
     Bit#(n) sum;
     Bit#(1) msb = truncateLSB(sum_u);
-    
+
     if (msb == 1) begin //if the carry bit overflows to the left
         //wrap it back around to the right.
         sum_u = truncate(addOnesCarry(sum_u, fromInteger(1)));
@@ -35,7 +35,7 @@ endfunction
 function Bit#(TAdd#(n,1)) addOnesCarry (Bit#(n) a, Bit#(n) b);
     //
     Bit#(TAdd#(n,1)) sum_u = {1'b0, a} + {1'b0, b};
-    
+
     return sum_u;
 
 endfunction
@@ -158,7 +158,7 @@ function DP makeConsistentSign(DP a);
             new_low = subOnes(low, 15'b100_000_000_000_000);
         end
         else begin //otherwise
-            
+
             if (high == 15'b1) begin //be careful of special case; can end up with -0 instead of 0
                 new_high = 15'b0; //move amount from larger SP to smaller SP
             end
@@ -190,4 +190,12 @@ function Fmt displayDecimal(Bit#(n) a)
     end
 
     return out;
+endfunction
+
+//  DABS(x)=|x|-1 if |x|>1, or +0 otherwise.
+function Bit#(n) dABS(Bit#(n) x);
+    // If is negative, make positive
+    Bit#(TSub#(n, 1)) abs = (x[valueOf(TSub#(n, 1))] == 1) ? ~truncate(x) : truncate(x);
+    // Subtract one if appropriate
+    return zeroExtend((abs == 0) ? abs : subOnes(abs, 1));
 endfunction
