@@ -23,4 +23,5 @@ interface MemAndRegWrapper;
 
     method Action writeMem(RealMemAddr addr, Word data);
     method Action writeReg(RegIdx idx, Word data);
+    method Action writeZImm(Word data);
 endinterface

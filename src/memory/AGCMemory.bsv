@@ -35,12 +35,13 @@ module mkAGCMemory(AGCMemory);
     BRAM2Port#(MemAddr, Word) bram <- mkBRAM2Server(cfg);
     MemInitIfc memInit <- mkMemInitBRAM(bram);
 
-    Vector#(NRegs, Ehr#(3, Word)) regFile <- replicateM(mkEhr(0));
+    Vector#(NRegs, Ehr#(4, Word)) regFile <- replicateM(mkEhr(0));
     Reg#(Bool) superbnk <- mkReg(False);
 
-    // HACK: Write ports need to be first to keep pipeline FIFO's happy, and we know iMemWrapper is never going to be used to write
-    MemAndRegWrapper iMemWrapper <- mkMemAndRegWrapper(bram.portA, regFile, 0, 0);
-    MemAndRegWrapper dMemWrapper <- mkMemAndRegWrapper(bram.portB, regFile, 2, 0);
+    // HACK: Write ports need to be first to keep pipeline FIFO's happy, and we know
+    // iMemWrapper is never going to be used to write except for writeZImm,
+    MemAndRegWrapper iMemWrapper <- mkMemAndRegWrapper(bram.portA, regFile, 1, 0, 0, 0);
+    MemAndRegWrapper dMemWrapper <- mkMemAndRegWrapper(bram.portB, regFile, 3, 1 /*not actually used*/, 1, 2);
 
     // Convert an AGC4 12-bit memory address to either a register
     // number or a 16-bit internal MemAddr;
@@ -98,6 +99,14 @@ module mkAGCMemory(AGCMemory);
         method ActionValue#(Instruction) resp() if (memInit.done);
             Instruction ret <- iMemWrapper.memResp();
             return ret;
+        endmethod
+
+        method Word getZ() if (memInit.done);
+            return iMemWrapper.readRegImm(rZ);
+        endmethod
+
+        method Action setZ(Word data) if (memInit.done);
+            iMemWrapper.writeZImm(data);
         endmethod
     endinterface
 

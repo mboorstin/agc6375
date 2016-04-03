@@ -6,6 +6,8 @@ import Types::*;
 interface IMemory;
     method Action req(Addr addr);
     method ActionValue#(Instruction) resp();
+    method Word getZ();
+    method Action setZ(Word data);
 endinterface
 
 // A memory suitable for fetching AGC data.  Note that the

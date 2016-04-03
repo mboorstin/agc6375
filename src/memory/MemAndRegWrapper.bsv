@@ -7,7 +7,7 @@ import MemInit::*;
 import MemTypes::*;
 import Types::*;
 
-module mkMemAndRegWrapper(BRAMServer#(MemAddr, Word) bramPort, Vector#(NRegs, Ehr#(ehrSize, Word)) regFile, Integer readIdx, Integer writeIdx, MemAndRegWrapper ifc);
+module mkMemAndRegWrapper(BRAMServer#(MemAddr, Word) bramPort, Vector#(NRegs, Ehr#(ehrSize, Word)) regFile, Integer readIdx, Integer writeZIdx, Integer writeMemIdx, Integer writeRegIdx, MemAndRegWrapper ifc);
 
     // Register read FIFO's - used to make the results appear a cycle later
     Fifo#(2, Word) memDelayed <- mkCFFifo();
@@ -94,7 +94,7 @@ module mkMemAndRegWrapper(BRAMServer#(MemAddr, Word) bramPort, Vector#(NRegs, Eh
     // Add error checking!
     method Action writeMem(RealMemAddr realAddr, Word data);
         if (realAddr matches tagged RegNum .r) begin
-            setReg(r, data, writeIdx);
+            setReg(r, data, writeMemIdx);
         end else begin
             $display("writeMem: addr %x  data %x", realAddr.MemAddr, data);
             bramPort.request.put(BRAMRequest{
@@ -107,7 +107,13 @@ module mkMemAndRegWrapper(BRAMServer#(MemAddr, Word) bramPort, Vector#(NRegs, Eh
     endmethod
 
     method Action writeReg(RegIdx idx, Word data);
-        setReg(idx, data, writeIdx + 1);
+        $display("writeReg: regNum %d  data %x", idx, data);
+        setReg(idx, data, writeRegIdx);
+    endmethod
+
+    method Action writeZImm(Word data);
+        $display("writeZImm: data %x", data);
+        setReg(rZ, data, writeZIdx);
     endmethod
 
 endmodule

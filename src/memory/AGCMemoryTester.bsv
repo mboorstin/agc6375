@@ -2,6 +2,7 @@ import GetPut::*;
 
 import AGCMemory::*;
 import MemTypes::*;
+import TopLevelIfaces::*;
 import Types::*;
 
 (*synthesize*)

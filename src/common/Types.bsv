@@ -194,3 +194,47 @@ QCIO qcioROR = 4;
 QCIO qcioWOR = 5;
 QCIO qcioRXOR = 6;
 QCIO qcioEDRUPT = 7;
+
+// These are internal instructions numbers that, unlike the AGC instruction
+// set, have a one-to-one mapping with logical operations
+// Instruction numbers
+typedef enum {
+    TC,
+    CCS,
+    TCF,
+    DAS,
+    LXCH,
+    INCR,
+    ADS,
+    CA,
+    CS,
+    INDEX,
+    DXCH,
+    TS,
+    XCH,
+    AD,
+    MASK,
+    IO,
+    DV,
+    BZF,
+    MSU,
+    QXCH,
+    AUG,
+    DIM,
+    DCA,
+    DCS,
+    SU,
+    BZMF,
+    MP,
+    READ,
+    WRITE,
+    RAND,
+    WAND,
+    ROR,
+    WOR,
+    RXOR,
+    EDRUPT,
+    INHINT,
+    RELINT,
+    EXTEND
+} InstNum deriving (Eq, Bits, FShow);

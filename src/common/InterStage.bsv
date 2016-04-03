@@ -2,20 +2,26 @@ import Types::*;
 
 typedef struct {
     Addr z;
-} Fetch2Decode deriving (Eq, Bits);
+} Fetch2Decode deriving (Eq, Bits, FShow);
+
+typedef struct {
+    Maybe#(Addr) memAddr;
+    Maybe#(RegIdx) regNum;
+    InstNum instNum;
+} DecodeRes deriving (Eq, Bits, FShow);
 
 typedef struct {
     Addr z;
     Instruction inst;
-    Bool isExtended;
+    InstNum instNum;
     Bool deqFromMem;
     Bool deqFromReg;
-} Decode2Exec deriving (Eq, Bits);
+} Decode2Exec deriving (Eq, Bits, FShow);
 
 typedef struct {
     Addr z;
     Instruction inst;
-    Bool isExtended;
+    InstNum instNum;
     Maybe#(Word) memResp; //corresponds to deqFromMem
     Maybe#(Word) regResp; //corresponds to deqFromReg
 } ExecFuncArgs deriving (Eq, Bits, FShow);
@@ -25,6 +31,5 @@ typedef struct {
     Word eRes2; //corresponds to regNum
     Maybe#(Addr) memAddr;
     Maybe#(RegIdx) regNum;
-    // Should only be used for TS instruction
-    Maybe#(Addr) newZ;
+    Addr newZ;
 } Exec2Writeback deriving (Eq, Bits, FShow);

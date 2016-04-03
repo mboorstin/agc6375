@@ -10,7 +10,7 @@ import sys
 
 if len(sys.argv) != 3:
     print "Usage: ./toVMH [input bin] [output vmh]"
-    raise
+    exit(1)
 
 inFilePath = sys.argv[1]
 outFilePath = sys.argv[2]

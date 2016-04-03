@@ -12,164 +12,26 @@ TAGEXCEPTION: places with overflows/other exceptions to be implemented
 
 (* noinline *)
 function Exec2Writeback exec(ExecFuncArgs args);
-    //exec
+    case (args.instNum)
+        AD: return ad(args);
+        ADS: return ads(args);
+        AUG: return aug(args);
+        BZF: return bzf(args);
+        BZMF: return bzmf(args);
+        CA: return ca(args);
+        CCS: return ccs(args);
+        CS: return cs(args);
+        DIM: return dim(args);
+        // Bunch of double's here
+        INCR: return incr(args);
+        // Bunch of other stuff here
+        LXCH: return lxch(args);
+        MASK: return mask(args);
 
-    //pulling data out of inst
-    Bit#(3) ccc = args.inst[15:13]; //primary opcode values
-    //Bit#(13) addr = args.inst[12:0]; //all bits that may contain address info
-    Bit#(2) qq = args.inst[12:11]; //secondary opcode values (qc values)
-    Bit#(3) ppp = args.inst[12:10]; //secondary opcode values for IO instructions (pc values)
-
-
-    //maybe there's a better way to set this up?  Either way, I'm so sorry.
-    //extracode
-    if (args.isExtended) begin
-        //
-        case(ccc)
-            opIO: begin //corresponds to I/O instructions
-                case(ppp)
-                    qcioREAD: begin //READ
-                        return ?;
-                    end
-                    qcioWRITE: begin //WRITE
-                        return ?;
-                    end
-                    qcioRAND: begin //RAND
-                        return ?;
-                    end
-                    qcioWAND: begin //WAND
-                        return ?;
-                    end
-                    qcioROR: begin //ROR
-                        return ?;
-                    end
-                    qcioWOR: begin //WOR
-                        return ?;
-                    end
-                    qcioRXOR: begin //RXOR
-                        return ?;
-                    end
-                    qcioEDRUPT: begin //EDRUPT
-                        return ?;
-                    end
-                endcase
-            end
-            opDV: begin //corresponds to DV and BZF
-                if (qq == qcDV) begin //DV
-                    return ?;
-                end
-                else begin //BZF
-                    return bzf(args);
-                end
-            end
-            opMSU: begin //corresponds to MSU, QXCH, AUG, and DIM
-                case(qq)
-                    qcMSU: begin //MSU
-                        return ?;
-                    end
-                    qcQXCH: begin //QXCH
-                        return ?;
-                    end
-                    qcAUG: begin //AUG
-                        return aug(args);
-                    end
-                    qcDIM: begin //DIM
-                        return dim(args);
-                    end
-                endcase
-            end
-            opDCA: begin //DCA
-                return ?;
-            end
-            opDCS: begin //DCS
-                return ?;
-            end
-            opINDEX: begin //INDEX
-                return ?;
-            end
-            opSU: begin //corresponds to SU and BZMF
-                if  (qq == qcSU) begin //SU
-                    return ?;
-                end
-                else begin //BZMF
-                    return bzmf(args);
-                end
-            end
-            opMP: begin //MP
-                return ?;
-            end
-        endcase
-    end
-    else begin //not extracode
-        case (ccc)
-            opTC: begin //TC
-                return ?;
-            end
-            opCCS: begin //corresponds to CCS and TCF
-                if (qq == qcCCS) begin //CCS
-                    return ccs(args);
-                end
-                else begin //TCF
-                    return ?;
-                end
-            end
-            opDAS: begin //corresponds to DAS, LXCH, INCR, and ADS
-                case (qq)
-                    qcDAS: begin //DAS
-                        return ?;
-                    end
-                    qcLXCH: begin //LXCH
-                        return lxch(args);
-                    end
-                    qcINCR: begin //INCR
-                        return incr(args);
-                    end
-                    qcADS: begin //ADS
-                        return ads(args);
-                    end
-                endcase
-            end
-            opCA: begin //CA
-                return ca(args);
-            end
-            opCS: begin //CS
-                return cs(args);
-            end
-            opINDEX: begin //corresponds to INDEX, DXCH, TS, XCH
-                case (qq)
-                    qcINDEX: begin //INDEX
-                        return ?;
-                    end
-                    qcDXCH: begin //DXCH
-                        return ?;
-                    end
-                    qcTS: begin //TS
-                        return ?;
-                    end
-                    qcXCH: begin //XCH
-                        return ?;
-                    end
-                endcase
-            end
-            opAD: begin //AD
-                return ad(args);
-            end
-            opMASK: begin //MASK
-                return mask(args);
-            end
-        endcase
-    end
-
-    //encoding output
-    /*Exec2Writeback e2w = Exec2Writeback{
-    eRes1:eRes1,
-    eRes2:eRes2,
-    memAddr:memAddr,
-    regNum:regNum,
-    newZ:newZ,
-    };
-    return e2w;*/
-
+        // Once we're done with everything, should turn into a
+        // raise unimplemented error
+        default: return unimplemented(args);
+    endcase
 endfunction
 
 
@@ -203,7 +65,7 @@ function Exec2Writeback ad(ExecFuncArgs args);
         eRes2:sum, //write sum back to accumulator only
         memAddr: tagged Invalid,
         regNum: tagged Valid rA, //accumulator
-        newZ: tagged Invalid
+        newZ: args.z + 1
     };
     return e2w;
 endfunction
@@ -233,7 +95,7 @@ function Exec2Writeback ads(ExecFuncArgs args);
         eRes2:sum, //write sum back to both
         memAddr: tagged Valid mem_addr_wb,
         regNum: tagged Valid rA, //accumulator
-        newZ: tagged Invalid
+        newZ: args.z + 1
     };
     return e2w;
 endfunction
@@ -270,7 +132,7 @@ function Exec2Writeback aug(ExecFuncArgs args);
         eRes2: 0,
         memAddr: tagged Valid memAddr,
         regNum: tagged Invalid,
-        newZ: tagged Invalid
+        newZ: args.z + 1
     };
 endfunction
 
@@ -284,7 +146,7 @@ function Exec2Writeback bzf(ExecFuncArgs args);
 
     Bool doBranch = (acc[15] == acc[14]) && ((acc[14:0] == 0) || (acc[14:0] == ~0));
 
-    Maybe#(Addr) newZ = doBranch ? tagged Valid args.inst[12:1] : tagged Invalid;
+    Addr newZ = doBranch ? args.inst[12:1] : (args.z + 1);
 
     return Exec2Writeback {
         eRes1: 0,
@@ -305,7 +167,7 @@ function Exec2Writeback bzmf(ExecFuncArgs args);
 
     Bool doBranch = (acc[15] == acc[14]) ? ((acc[14:0] == 0) || acc[14] == 1) : (acc[15:14] == 2'b10);
 
-    Maybe#(Addr) newZ = doBranch ? tagged Valid args.inst[12:1] : tagged Invalid;
+    Addr newZ = doBranch ? args.inst[12:1] : (args.z + 1);
 
     return Exec2Writeback {
         eRes1: 0,
@@ -331,7 +193,7 @@ function Exec2Writeback ca(ExecFuncArgs args);
         eRes2: newAcc,
         memAddr: tagged Invalid,
         regNum: tagged Valid rA,
-        newZ: tagged Invalid
+        newZ: args.z + 1
     };
 endfunction
 
@@ -389,7 +251,7 @@ function Exec2Writeback ccs(ExecFuncArgs args);
         eRes2: dabs,
         memAddr: tagged Invalid,
         regNum: tagged Valid rA,
-        newZ: tagged Valid addOnes(args.z, addend)
+        newZ: args.z + addend
     };
 endfunction
 
@@ -411,7 +273,7 @@ function Exec2Writeback cs(ExecFuncArgs args);
         eRes2: acc,
         memAddr: tagged Invalid,
         regNum: tagged Valid rA,
-        newZ: tagged Invalid
+        newZ: args.z + 1
     };
 endfunction
 
@@ -452,7 +314,7 @@ function Exec2Writeback dim(ExecFuncArgs args);
         eRes2: 0,
         memAddr: tagged Valid memAddr,
         regNum: tagged Invalid,
-        newZ: tagged Invalid
+        newZ: args.z + 1
     };
 endfunction
 
@@ -478,7 +340,7 @@ function Exec2Writeback incr(ExecFuncArgs args);
         eRes2: 0,
         memAddr: tagged Valid memAddr,
         regNum: tagged Invalid,
-        newZ: tagged Invalid
+        newZ: args.z + 1
     };
 endfunction
 
@@ -503,7 +365,7 @@ function Exec2Writeback lxch(ExecFuncArgs args);
         eRes2: newL,
         memAddr: tagged Valid memAddr,
         regNum: tagged Valid rL,
-        newZ: tagged Invalid
+        newZ: args.z + 1
     };
 endfunction
 
@@ -531,6 +393,16 @@ function Exec2Writeback mask(ExecFuncArgs args);
         eRes2: newA,
         memAddr: tagged Invalid,
         regNum: tagged Valid rA,
-        newZ: tagged Invalid
+        newZ: args.z + 1
+    };
+endfunction
+
+function Exec2Writeback unimplemented(ExecFuncArgs args);
+    return Exec2Writeback {
+        eRes1: 0,
+        eRes2: 0,
+        memAddr: tagged Invalid,
+        regNum: tagged Invalid,
+        newZ: args.z + 1
     };
 endfunction
