@@ -80,8 +80,8 @@ module mkMemAndRegWrapper(BRAMServer#(MemAddr, Word) bramPort, Vector#(NRegs, Eh
             memDelayed.deq();
             return memDelayed.first;
         end else begin
-            $display("memResp: from mem");
             Instruction ret <- bramPort.response.get;
+            $display("memResp: from mem: %x", ret);
             return ret;
         end
     endmethod

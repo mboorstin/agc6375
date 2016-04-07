@@ -3,6 +3,7 @@ import Decode::*;
 import Exec::*;
 import Fifo::*;
 import InterStage::*;
+import IO::*;
 import TopLevelIfaces::*;
 import Types::*;
 
@@ -19,6 +20,7 @@ typedef enum {
 module mkAGC(AGC);
     // General state
     AGCMemory memory <- mkAGCMemory();
+    AGCIO io <- mkAGCIO();
 
     // Stage management
     Reg#(Stage) stage <- mkReg(Init);
@@ -70,10 +72,18 @@ module mkAGC(AGC);
         // Do the decode
         DecodeRes decoded = decode(inst, isExtended);
 
-        // Do the memory requests
-        if (isValid(decoded.memAddr)) begin
-           memory.fetcher.memReq(fromMaybe(?, decoded.memAddr));
+        $display("Decoded instruction: ", fshow(decoded.instNum));
+
+        // Do the memory and IO requests
+        MemOrIODeq deqFromMemOrIO = None;
+        if (decoded.memAddrOrIOChannel matches tagged Addr .addr) begin
+           memory.fetcher.memReq(addr);
+           deqFromMemOrIO = Mem;
+        end else if (decoded.memAddrOrIOChannel matches tagged IOChannel .channel) begin
+            io.internalIO.readReq(channel);
+            deqFromMemOrIO = IO;
         end
+
         if (isValid(decoded.regNum)) begin
             memory.fetcher.regReq(fromMaybe(?, decoded.regNum));
         end
@@ -90,7 +100,7 @@ module mkAGC(AGC);
             z: last.z,
             inst: inst,
             instNum: decoded.instNum,
-            deqFromMem: isValid(decoded.memAddr),
+            deqFromMemOrIO: deqFromMemOrIO,
             deqFromReg: isValid(decoded.regNum)
         });
 
@@ -108,16 +118,20 @@ module mkAGC(AGC);
         $display("Execute");
         // Get the data from decode
         Decode2Exec last = d2e.first();
+        $display("d2e.first: ", fshow(last));
         d2e.deq();
 
         // Get the memory responses if necessary.
         // Doing if's because of ActionValue sadness
-        Maybe#(Word) memResp;
-        if (last.deqFromMem) begin
-            let memRespVal <- memory.fetcher.memResp();
-            memResp = tagged Valid memRespVal;
+        Maybe#(Word) memOrIOResp;
+        if (last.deqFromMemOrIO == Mem) begin
+            let memResp <- memory.fetcher.memResp();
+            memOrIOResp = tagged Valid memResp;
+        end else if (last.deqFromMemOrIO == IO) begin
+            let ioResp <- io.internalIO.readResp();
+            memOrIOResp = tagged Valid ioResp;
         end else begin
-            memResp = tagged Invalid;
+            memOrIOResp = tagged Invalid;
         end
 
         Maybe#(Word) regResp;
@@ -129,14 +143,14 @@ module mkAGC(AGC);
         end
 
         // Set the index addend if necessary
-        indexAddend <= (last.instNum == INDEX) ? memResp : tagged Invalid;
+        indexAddend <= (last.instNum == INDEX) ? memOrIOResp : tagged Invalid;
 
         // Do the actual computations
         ExecFuncArgs execArgs = ExecFuncArgs{
             z: last.z,
             inst: last.inst,
             instNum: last.instNum,
-            memResp: memResp,
+            memOrIOResp: memOrIOResp,
             regResp: regResp
         };
         Exec2Writeback execRes = exec(execArgs);
@@ -152,14 +166,17 @@ module mkAGC(AGC);
         $display("Writeback");
         // Get the data from execute
         Exec2Writeback last = e2w.first();
+        $display("e2w.first: ", fshow(last));
         e2w.deq();
 
         // Set Z
         memory.imem.setZ({0, last.newZ, 1'b0});
 
-        // Make the memory requests if necessary
-        if (isValid(last.memAddr)) begin
-            memory.storer.memStore(fromMaybe(?, last.memAddr), last.eRes1);
+        // Make the memory and I/O requests if necessary
+        if (last.memAddrOrIOChannel matches tagged Addr .addr) begin
+            memory.storer.memStore(addr, last.eRes1);
+        end else if (last.memAddrOrIOChannel matches tagged IOChannel .channel) begin
+            io.internalIO.write(channel, last.eRes1);
         end
         if (isValid(last.regNum)) begin
             memory.storer.regStore(fromMaybe(?, last.regNum), last.eRes2);
@@ -169,15 +186,17 @@ module mkAGC(AGC);
         stage <= Fetch;
     endrule
 
-    // Should dequeue from a FIFO of requests or something like that
-    // For now, guarding so that it doesn't constantly run
-    method ActionValue#(IOPacket) ioAGCToHost if (False && memory.init.done);
-        return ?;
-    endmethod
+    // Need guards so can't just do interface HostIO hostIO = io
+    interface HostIO hostIO;
+        method ActionValue#(IOPacket) agcToHost if (memory.init.done);
+            IOPacket ret <- io.hostIO.agcToHost();
+            return ret;
+        endmethod
 
-    method Action ioHostToAGC(IOPacket packet) if ((stage != Init) && memory.init.done);
-
-    endmethod
+        method Action hostToAGC(IOPacket packet) if ((stage != Init) && memory.init.done);
+            io.hostIO.hostToAGC(packet);
+        endmethod
+    endinterface
 
     method Action start(Addr startZ) if ((stage == Init) && memory.init.done);
         $display("Called start!");

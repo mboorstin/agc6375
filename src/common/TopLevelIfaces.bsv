@@ -29,9 +29,28 @@ interface DMemoryStorer;
     method Action regStore(RegIdx idx, Word data);
 endinterface
 
+// An interface for handling the superbank
+interface SuperbankProvider;
+    method Action set(Word data);
+    method Word get();
+endinterface
+
 interface AGCMemory;
     interface IMemory imem;
     interface DMemoryFetcher fetcher;
     interface DMemoryStorer storer;
+    interface SuperbankProvider superbank;
     interface MemInitIfc init;
+endinterface
+
+interface InternalIO;
+    method Action readReq(IOChannel channel);
+    method ActionValue#(Word) readResp();
+
+    method Action write(IOChannel channel, Word data);
+endinterface
+
+interface AGCIO;
+    interface HostIO hostIO;
+    interface InternalIO internalIO;
 endinterface

@@ -36,7 +36,7 @@ module mkAGCMemory(AGCMemory);
     MemInitIfc memInit <- mkMemInitBRAM(bram);
 
     Vector#(NRegs, Ehr#(4, Word)) regFile <- replicateM(mkEhr(0));
-    Reg#(Bool) superbnk <- mkReg(False);
+    Reg#(Bool) superbankBit <- mkReg(False);
 
     // HACK: Write ports need to be first to keep pipeline FIFO's happy, and we know
     // iMemWrapper is never going to be used to write except for writeZImm,
@@ -75,7 +75,7 @@ module mkAGCMemory(AGCMemory);
                 fbank = truncateLSB(iMemWrapper.readRegImm(rFB));
                 // Lower banks are directly accessible via FB; upper ones
                 // are switched via the FEB bit.
-                if ((fbank >= 24) && superbnk) begin
+                if ((fbank >= 24) && superbankBit) begin
                     fbank = fbank + 8;
                     // Banks 36 - 39 didn't physically exist - we don't implement them
                     // TODO: HAVE A WARNING HERE!
@@ -137,6 +137,16 @@ module mkAGCMemory(AGCMemory);
 
         method Action regStore(RegIdx idx, Word data) if (memInit.done);
             dMemWrapper.writeReg(idx, data);
+        endmethod
+    endinterface
+
+    interface SuperbankProvider superbank;
+        method Action set(Word data) if (memInit.done);
+            superbankBit <= (data[7] == 1);
+        endmethod
+
+        method Word get() if (memInit.done);
+            return {0, superbankBit ? 1'b1 : 1'b0, 7'b0};
         endmethod
     endinterface
 

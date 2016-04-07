@@ -26,8 +26,8 @@ module [SceMiModule] mkSceMiLayer();
     SceMiClockPortIfc clkPort <- mkSceMiClockPort(conf);
     DutInterface dut <- buildDutWithSoftReset(mkDutWrapper, clkPort);
 
-    Empty ioAGCToHost <- mkGetXactor(toGet(dut.ioAGCToHost), clkPort);
-    Empty ioHostToAGC <- mkPutXactor(toPut(dut.ioHostToAGC), clkPort);
+    Empty ioAGCToHost <- mkGetXactor(toGet(dut.hostIO.agcToHost), clkPort);
+    Empty ioHostToAGC <- mkPutXactor(toPut(dut.hostIO.hostToAGC), clkPort);
     Empty start <- mkPutXactor(toPut(dut.start), clkPort);
     Empty memInit <- mkPutXactor(dut.memInit.request, clkPort);
 

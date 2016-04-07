@@ -7,7 +7,7 @@ typedef 16 WordSz;
 typedef Bit#(WordSz) Word;
 typedef Word Instruction;
 
-typedef 8 IOChannelSize;
+typedef 7 IOChannelSize;
 typedef Bit#(IOChannelSize) IOChannel;
 
 typedef struct {
@@ -37,11 +37,17 @@ interface MemInitIfc;
     method Bool done();
 endinterface
 
-interface AGC;
+interface HostIO;
     // I/O send (ie, WRITE)
-    method ActionValue#(IOPacket) ioAGCToHost;
+    method ActionValue#(IOPacket) agcToHost;
     // I/O receive (ie, READ)
-    method Action ioHostToAGC(IOPacket packet);
+    method Action hostToAGC(IOPacket packet);
+endinterface
+
+interface AGC;
+    // I/O
+    interface HostIO hostIO;
+
     // Start the simulation
     // Can maybe replace this with an ioHostToAGC call,
     // or hardcode where it's actually support to start and have
@@ -116,6 +122,10 @@ endfunction
 
 function Bool is16BitRegM(Addr a);
     return (a[11:2] == 0) && is16BitReg(truncate(a));
+endfunction
+
+function Bool is16BitChannel(IOChannel c);
+    return (c == 1) || (c == 2);
 endfunction
 
 // Opcodes
@@ -214,7 +224,6 @@ typedef enum {
     XCH,
     AD,
     MASK,
-    IO,
     DV,
     BZF,
     MSU,

@@ -16,10 +16,10 @@ function DecodeRes decode(Instruction inst, Bool isExtended);
             opIO: begin //corresponds to I/O instructions
                 case(ppp)
                     qcioREAD: begin //READ
-                        return ?;
+                        return dREAD(inst);
                     end
                     qcioWRITE: begin //WRITE
-                        return ?;
+                        return dWRITE();
                     end
                     qcioRAND: begin //RAND
                         return ?;
@@ -130,7 +130,7 @@ function DecodeRes decode(Instruction inst, Bool isExtended);
                 endcase
             end
             opCA: begin //CA
-                return?;
+                return dCA(inst);
             end
             opCS: begin //CS
                 return?;
@@ -163,15 +163,23 @@ endfunction
 
 function DecodeRes dADS(Instruction inst);
     return DecodeRes {
-        memAddr: tagged Valid zeroExtend(inst[10:1]),
+        memAddrOrIOChannel: tagged Addr zeroExtend(inst[10:1]),
         regNum: tagged Valid rA,
         instNum: ADS
     };
 endfunction
 
+function DecodeRes dCA(Instruction inst);
+    return DecodeRes {
+        memAddrOrIOChannel: tagged Addr zeroExtend(inst[12:1]),
+        regNum: tagged Invalid,
+        instNum: CA
+    };
+endfunction
+
 function DecodeRes dEDRUPT();
     return DecodeRes {
-        memAddr: tagged Invalid,
+        memAddrOrIOChannel: tagged None,
         regNum: tagged Invalid,
         instNum: EDRUPT
     };
@@ -179,8 +187,24 @@ endfunction
 
 function DecodeRes dEXTEND();
     return DecodeRes {
-        memAddr: tagged Invalid,
+        memAddrOrIOChannel: tagged None,
         regNum: tagged Invalid,
         instNum: EXTEND
+    };
+endfunction
+
+function DecodeRes dREAD(Instruction inst);
+    return DecodeRes {
+        memAddrOrIOChannel: tagged IOChannel inst[7:1],
+        regNum: tagged Invalid,
+        instNum: READ
+    };
+endfunction
+
+function DecodeRes dWRITE();
+    return DecodeRes {
+        memAddrOrIOChannel: tagged None,
+        regNum: tagged Valid rA,
+        instNum: WRITE
     };
 endfunction

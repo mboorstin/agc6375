@@ -27,6 +27,10 @@ function Exec2Writeback exec(ExecFuncArgs args);
         // Bunch of other stuff here
         LXCH: return lxch(args);
         MASK: return mask(args);
+        // Bunch of stuff here
+        READ: return read(args);
+        // Bunch of stuff here
+        WRITE: return write(args);
 
         // Once we're done with everything, should turn into a
         // raise unimplemented error
@@ -45,7 +49,7 @@ function Exec2Writeback ad(ExecFuncArgs args);
     //address is 12 bits; not an extracode, so ignore LSB.
     //Addr k = args.inst[12:1];
 
-    Word mem_resp = fromMaybe(?, args.memResp);
+    Word mem_resp = fromMaybe(?, args.memOrIOResp);
     Word reg_resp = fromMaybe(?, args.regResp);
 
 
@@ -63,7 +67,7 @@ function Exec2Writeback ad(ExecFuncArgs args);
     Exec2Writeback e2w = Exec2Writeback{
         eRes1:16'b0,
         eRes2:sum, //write sum back to accumulator only
-        memAddr: tagged Invalid,
+        memAddrOrIOChannel: tagged None,
         regNum: tagged Valid rA, //accumulator
         newZ: args.z + 1
     };
@@ -75,7 +79,7 @@ endfunction
 //and stores the result back in both the accumulator and memory location.
 function Exec2Writeback ads(ExecFuncArgs args);
 
-    Word mem_resp = fromMaybe(?, args.memResp);
+    Word mem_resp = fromMaybe(?, args.memOrIOResp);
     Word reg_resp = fromMaybe(?, args.regResp);
 
     //mem_resp is the value to be added to the accumulator.
@@ -93,7 +97,7 @@ function Exec2Writeback ads(ExecFuncArgs args);
     Exec2Writeback e2w = Exec2Writeback{
         eRes1:sum,
         eRes2:sum, //write sum back to both
-        memAddr: tagged Valid mem_addr_wb,
+        memAddrOrIOChannel: tagged Addr mem_addr_wb,
         regNum: tagged Valid rA, //accumulator
         newZ: args.z + 1
     };
@@ -113,7 +117,7 @@ function Bit#(n) addOrSub(Bit#(n) val);
 endfunction
 
 function Exec2Writeback aug(ExecFuncArgs args);
-    Word memResp = fromMaybe(?, args.memResp);
+    Word memResp = fromMaybe(?, args.memOrIOResp);
 
     Word auged;
 
@@ -130,7 +134,7 @@ function Exec2Writeback aug(ExecFuncArgs args);
         eRes1: auged,
         // Should be ? but setting to 0 to keep tests happy
         eRes2: 0,
-        memAddr: tagged Valid memAddr,
+        memAddrOrIOChannel: tagged Addr memAddr,
         regNum: tagged Invalid,
         newZ: args.z + 1
     };
@@ -151,7 +155,7 @@ function Exec2Writeback bzf(ExecFuncArgs args);
     return Exec2Writeback {
         eRes1: 0,
         eRes2: 0,
-        memAddr: tagged Invalid,
+        memAddrOrIOChannel: tagged None,
         regNum: tagged Invalid,
         newZ: newZ
     };
@@ -172,7 +176,7 @@ function Exec2Writeback bzmf(ExecFuncArgs args);
     return Exec2Writeback {
         eRes1: 0,
         eRes2: 0,
-        memAddr: tagged Invalid,
+        memAddrOrIOChannel: tagged None,
         regNum: tagged Invalid,
         newZ: newZ
     };
@@ -182,7 +186,7 @@ endfunction
 // The "Clear and Add" (or "Clear and Add Erasable" or "Clear and Add Fixed")
 // instruction moves the contents of a memory location into the accumulator.
 function Exec2Writeback ca(ExecFuncArgs args);
-    Word memResp = fromMaybe(?, args.memResp);
+    Word memResp = fromMaybe(?, args.memOrIOResp);
     Addr memAddr = args.inst[12:1]; // TAGLSB
 
     // TAGLSB
@@ -191,7 +195,7 @@ function Exec2Writeback ca(ExecFuncArgs args);
     return Exec2Writeback {
         eRes1: 0,
         eRes2: newAcc,
-        memAddr: tagged Invalid,
+        memAddrOrIOChannel: tagged None,
         regNum: tagged Valid rA,
         newZ: args.z + 1
     };
@@ -202,7 +206,7 @@ endfunction
 // accumulator (which is decremented), and then performs one of several jumps based on the original
 // value of the variable.  This is the only "compare" instruction in the AGC instruction set.
 function Exec2Writeback ccs(ExecFuncArgs args);
-    Word memResp = fromMaybe(?, args.memResp);
+    Word memResp = fromMaybe(?, args.memOrIOResp);
     Addr memAddr = args.inst[12:1]; // TAGLSB
 
     Bool is16Bits = is16BitRegM(memAddr);
@@ -249,7 +253,7 @@ function Exec2Writeback ccs(ExecFuncArgs args);
     return Exec2Writeback {
         eRes1: 0,
         eRes2: dabs,
-        memAddr: tagged Invalid,
+        memAddrOrIOChannel: tagged None,
         regNum: tagged Valid rA,
         newZ: args.z + addend
     };
@@ -259,7 +263,7 @@ endfunction
 // The "Clear and Subtract" instruction moves the 1's-complement (i.e., the negative) of a memory location into
 // the accumulator.
 function Exec2Writeback cs(ExecFuncArgs args);
-    Word memResp = fromMaybe(?, args.memResp);
+    Word memResp = fromMaybe(?, args.memOrIOResp);
     Addr memAddr = args.inst[12:1]; // TAGLSB
 
     Bit#(15) upper = ~memResp[15:1];
@@ -271,7 +275,7 @@ function Exec2Writeback cs(ExecFuncArgs args);
     return Exec2Writeback {
         eRes1: 0,
         eRes2: acc,
-        memAddr: tagged Invalid,
+        memAddrOrIOChannel: tagged None,
         regNum: tagged Valid rA,
         newZ: args.z + 1
     };
@@ -295,7 +299,7 @@ function Bit#(n) subOrAddNonZero(Bit#(n) val);
 endfunction
 
 function Exec2Writeback dim(ExecFuncArgs args);
-    Word memResp = fromMaybe(?, args.memResp);
+    Word memResp = fromMaybe(?, args.memOrIOResp);
 
     Word dimmed;
 
@@ -312,7 +316,7 @@ function Exec2Writeback dim(ExecFuncArgs args);
         eRes1: dimmed,
         // Should be ? but setting to 0 to keep tests happy
         eRes2: 0,
-        memAddr: tagged Valid memAddr,
+        memAddrOrIOChannel: tagged Addr memAddr,
         regNum: tagged Invalid,
         newZ: args.z + 1
     };
@@ -321,7 +325,7 @@ endfunction
 // INCR
 // The "Increment" instruction increments an erasable-memory location in-place by +1.
 function Exec2Writeback incr(ExecFuncArgs args);
-    Word memResp = fromMaybe(?, args.memResp);
+    Word memResp = fromMaybe(?, args.memOrIOResp);
 
     Word auged;
 
@@ -338,7 +342,7 @@ function Exec2Writeback incr(ExecFuncArgs args);
         eRes1: auged,
         // Should be ? but setting to 0 to keep tests happy
         eRes2: 0,
-        memAddr: tagged Valid memAddr,
+        memAddrOrIOChannel: tagged Addr memAddr,
         regNum: tagged Invalid,
         newZ: args.z + 1
     };
@@ -348,7 +352,7 @@ endfunction
 // The "Exchange L and K" instruction exchanges the value in the L register with a
 // value stored in erasable memory.
 function Exec2Writeback lxch(ExecFuncArgs args);
-    Word memResp = fromMaybe(?, args.memResp);
+    Word memResp = fromMaybe(?, args.memOrIOResp);
     Word lResp = fromMaybe(?, args.regResp);
 
     Addr memAddr = {2'b0, args.inst[10:1]};
@@ -363,7 +367,7 @@ function Exec2Writeback lxch(ExecFuncArgs args);
     return Exec2Writeback {
         eRes1: newMem,
         eRes2: newL,
-        memAddr: tagged Valid memAddr,
+        memAddrOrIOChannel: tagged Addr memAddr,
         regNum: tagged Valid rL,
         newZ: args.z + 1
     };
@@ -373,7 +377,7 @@ endfunction
 // The "Mask A by K" instruction logically ANDs the contents of a memory
 // location bitwise into the accumulator.
 function Exec2Writeback mask(ExecFuncArgs args);
-    Word memResp = fromMaybe(?, args.memResp);
+    Word memResp = fromMaybe(?, args.memOrIOResp);
     Word aResp = fromMaybe(?, args.regResp);
 
     Addr memAddr = {2'b0, args.inst[10:1]};
@@ -391,17 +395,49 @@ function Exec2Writeback mask(ExecFuncArgs args);
     return Exec2Writeback {
         eRes1: 0,
         eRes2: newA,
-        memAddr: tagged Invalid,
+        memAddrOrIOChannel: tagged None,
         regNum: tagged Valid rA,
         newZ: args.z + 1
     };
 endfunction
 
+// READ
+// The "Read Channel KC" instruction moves the contents of an i/o channel
+// into the accumulator.
+function Exec2Writeback read(ExecFuncArgs args);
+    Word ioResp = fromMaybe(?, args.memOrIOResp);
+
+    return Exec2Writeback {
+        eRes1: 0,
+        eRes2: is16BitChannel(args.inst[7:1]) ? ioResp : signExtend(ioResp[15:1]),
+        memAddrOrIOChannel: tagged None,
+        regNum: tagged Valid rA,
+        newZ: args.z + 1
+    };
+endfunction
+
+// WRITE
+// The "Write Channel KC" instruction moves the contents of the accumulator into an i/o channel.
+function Exec2Writeback write(ExecFuncArgs args);
+    Word acc = fromMaybe(?, args.regResp);
+    IOChannel channel = args.inst[7:1];
+
+     //TAGEXCEPTION
+     return Exec2Writeback {
+        eRes1: is16BitChannel(channel) ? acc : {acc[14:0], 0},
+        eRes2: 0,
+        memAddrOrIOChannel: tagged IOChannel channel,
+        regNum: tagged Invalid,
+        newZ: args.z + 1
+     };
+endfunction
+
+
 function Exec2Writeback unimplemented(ExecFuncArgs args);
     return Exec2Writeback {
         eRes1: 0,
         eRes2: 0,
-        memAddr: tagged Invalid,
+        memAddrOrIOChannel: tagged None,
         regNum: tagged Invalid,
         newZ: args.z + 1
     };

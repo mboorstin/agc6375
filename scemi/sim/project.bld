@@ -7,7 +7,7 @@ bsc-link-options:    -Xc++ -O0 -keep-fires
 hide-target
 top-module:             mkBridge
 top-file:               ../Bridge.bsv
-bsv-source-directories: ../../scemi ../../src ../../src/common ../../src/includes ../../src/memory ../../src/exec ../../src/decode
+bsv-source-directories: ../../scemi ../../src ../../src/common ../../src/includes ../../src/memory ../../src/exec ../../src/decode ../../src/io
 verilog-directory:      build/vlog_dut
 binary-directory:       build/bdir_dut
 simulation-directory:   build/simdir_dut

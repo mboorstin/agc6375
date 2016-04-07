@@ -267,6 +267,11 @@ int main(int argc, char* argv[]) {
         exitCleanly(&shutdown, scemiServiceThread, sceMi, serverFD, 1);
     }
 
+    // Until we can find a better solution for this, wait to start the processor
+    // so we can connect yaDSKY2
+    printf("Press Enter to start\n");
+    getchar();
+
     // Finally, start the processor
     start.sendMessage(AGC_START_IP);
 
