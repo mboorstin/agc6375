@@ -31,6 +31,12 @@ function Bit#(n) addOnes (Bit#(n) a, Bit#(n) b);
 
 endfunction
 
+//addition
+//automatically overflow-corrected
+/*function Bit#(n) addOnesOverflow (Bit#(n) a, Bit#(n) b);
+
+endfunction*/
+
 //returns the sum of a and b with a carry bit as the MSB
 function Bit#(TAdd#(n,1)) addOnesCarry (Bit#(n) a, Bit#(n) b);
     //
@@ -174,6 +180,15 @@ function DP makeConsistentSign(DP a);
         out = a;
     end
     return out;
+endfunction
+
+//overflow correction of a value like that in the accumulator
+//bit 15 is only used for overflow correction / checking
+//usual use case is transferring an accumulator value outside
+//running it on a value which has not overflowed should return the same value.
+function SP overflowCorrect(Bit#(16) a);
+    SP result = {a[15],a[13:0]}; //extract magnitude bits and corrected sign bit from a
+    return result;
 endfunction
 
 function Fmt displayDecimal(Bit#(n) a)

@@ -19,7 +19,7 @@ module mkArithUtilTest ();
     spin1[5] = 15'o37776;
     spin1[6] = 15'o37776;
     spin1[7] = 15'o05760;
-    spin1[8] = 15'o00010;
+    spin1[8] = 15'o40000;
     spin1[9] = 15'o70000;
 
     Vector#(10, SP) spin2 = newVector;
@@ -31,7 +31,7 @@ module mkArithUtilTest ();
     spin2[5] = 15'o00001;
     spin2[6] = 15'o37776;
     spin2[7] = 15'o00001;
-    spin2[8] = 15'o00001;
+    spin2[8] = 15'o77776;
     spin2[9] = 15'o37776;
 
     Vector#(10, DP) dpin1 = newVector;
@@ -75,7 +75,10 @@ module mkArithUtilTest ();
     rule one_in (started && !done);
         //send in data
         for (Integer i = 0; i < 10; i = i + 1) begin
-            //SP result = subOnes(spin1[i], spin2[i]);
+            Bit#(1) lead1 = truncateLSB(spin1[i]);
+            Bit#(1) lead2 = truncateLSB(spin2[i]);
+            Bit#(16) result0 = addOnes({lead1, spin1[i]}, {lead2,spin2[i]});
+            SP result = overflowCorrect(result0);
             //DP result = addDP(dpin1[i], dpin2[i]);
             //DP result = makeConsistentSign(dpin1[i]);
 
@@ -87,13 +90,15 @@ module mkArithUtilTest ();
             end*/
 
             //multiplication test
-            DP prod = multOnes(spin1[i], spin2[i]);
+/*            DP prod = multOnes(spin1[i], spin2[i]);
             $display(displayDecimal(spin1[i]), "    *    ", displayDecimal(spin2[i]));
             $display($format("(") + displayDecimal(prod[29:15]) + $format(",    ") + displayDecimal(prod[14:0]) + $format(")"));
+*/
 
+            
 
             //Fmt fmt_result = $format("(") + displayDecimal(result[29:15]) + $format(",    ") + displayDecimal(result[14:0]) + $format(")");
-            //$display(displayDecimal(spin1[i]), $format("    -    "), displayDecimal(spin2[i]), $format("    =    "), displayDecimal(result));
+            $display(displayDecimal(spin1[i]), $format("    +    "), displayDecimal(spin2[i]), $format("    =    "), displayDecimal(result));
             //$display("%b", spin2[i]);
             //$display(displayDecimal(spin2[i]));
             //$display("{%b, %b} => {%b, %b}", dpin1[i][29:15], dpin1[i][14:0], result[29:15], result[14:0]);
