@@ -31,7 +31,7 @@ module mkArithUtilTest ();
     spin2[5] = 15'o00001;
     spin2[6] = 15'o37776;
     spin2[7] = 15'o00001;
-    spin2[8] = 15'o77776;
+    spin2[8] = 15'o77775;
     spin2[9] = 15'o37776;
 
     Vector#(10, DP) dpin1 = newVector;
@@ -39,12 +39,12 @@ module mkArithUtilTest ();
     dpin1[1] = 30'o00001_00001;
     dpin1[2] = 30'o00001_00001;
     dpin1[3] = 30'o00010_10000;
-    dpin1[4] = 30'o37777_40000;
-    dpin1[5] = 30'o37776_00001;
+    dpin1[4] = 30'o77777_40000;
+    dpin1[5] = 30'o77776_00001;
     dpin1[6] = 30'o00000_00001;
     dpin1[7] = 30'o40300_45600;
     dpin1[8] = 30'o00000_00000;
-    dpin1[9] = 30'o00000_00001;
+    dpin1[9] = 30'o77777_77776;
     Vector#(10, Fmt) fmt1 = newVector;
     for (Integer i = 0; i < 10; i = i + 1) begin
         fmt1[i] = $format("(") + displayDecimal(dpin1[i][29:15]) + $format(",    ") + displayDecimal(dpin1[i][14:0]) + $format(")");
@@ -75,10 +75,10 @@ module mkArithUtilTest ();
     rule one_in (started && !done);
         //send in data
         for (Integer i = 0; i < 10; i = i + 1) begin
-            Bit#(1) lead1 = truncateLSB(spin1[i]);
-            Bit#(1) lead2 = truncateLSB(spin2[i]);
-            Bit#(16) result0 = addOnes({lead1, spin1[i]}, {lead2,spin2[i]});
-            SP result = overflowCorrect(result0);
+            //Bit#(1) lead1 = truncateLSB(spin1[i]);
+            //Bit#(1) lead2 = truncateLSB(spin2[i]);
+            //Bit#(16) result0 = addOnes({lead1, spin1[i]}, {lead2,spin2[i]});
+            //SP result = overflowCorrect(result0);
             //DP result = addDP(dpin1[i], dpin2[i]);
             //DP result = makeConsistentSign(dpin1[i]);
 
@@ -91,14 +91,30 @@ module mkArithUtilTest ();
 
             //multiplication test
 /*            DP prod = multOnes(spin1[i], spin2[i]);
-            $display(displayDecimal(spin1[i]), "    *    ", displayDecimal(spin2[i]));
-            $display($format("(") + displayDecimal(prod[29:15]) + $format(",    ") + displayDecimal(prod[14:0]) + $format(")"));
+            DP prod_slow = multOnesSlow(spin1[i], spin2[i]);
+            if (prod != prod_slow) begin
+                $display(displayDecimal(spin1[i]), "    *    ", displayDecimal(spin2[i]));
+                $display($format("(") + displayDecimal(prod[29:15]) + $format(",    ") + displayDecimal(prod[14:0]) + $format(")"));
+                $display($format("(") + displayDecimal(prod_slow[29:15]) + $format(",    ") + displayDecimal(prod_slow[14:0]) + $format(")"));
+            end
 */
 
+            //overflow addition test
+            //SP result = addOnesOverflow(spin1[i], spin2[i]);
             
+            //division test
+            DP quot1 = divide(dpin1[i], spin1[i]);
+            $display(displayDecimal({dpin1[i][29:15], dpin1[i][13:0]}), "    /    ", displayDecimal(spin1[i]));
+            $display($format("(") + displayDecimal(quot1[29:15]) + $format(",    ") + displayDecimal(quot1[14:0]) + $format(")"));
+            $display("");
+
+            DP quot2 = divide(dpin2[i], spin2[i]);
+            $display(displayDecimal({dpin2[i][29:15], dpin2[i][13:0]}), "    /    ", displayDecimal(spin2[i]));
+            $display($format("(") + displayDecimal(quot2[29:15]) + $format(",    ") + displayDecimal(quot2[14:0]) + $format(")"));
+            $display("");
 
             //Fmt fmt_result = $format("(") + displayDecimal(result[29:15]) + $format(",    ") + displayDecimal(result[14:0]) + $format(")");
-            $display(displayDecimal(spin1[i]), $format("    +    "), displayDecimal(spin2[i]), $format("    =    "), displayDecimal(result));
+            //$display(displayDecimal(spin1[i]), $format("    +    "), displayDecimal(spin2[i]), $format("    =    "), displayDecimal(result));
             //$display("%b", spin2[i]);
             //$display(displayDecimal(spin2[i]));
             //$display("{%b, %b} => {%b, %b}", dpin1[i][29:15], dpin1[i][14:0], result[29:15], result[14:0]);
