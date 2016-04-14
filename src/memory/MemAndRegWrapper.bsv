@@ -22,10 +22,22 @@ module mkMemAndRegWrapper(BRAMServer#(MemAddr, Word) bramPort, Vector#(NRegs, Eh
         end
     endfunction
 
-    // Write a register - handles FB/EB/BB mirroring
+    // Write a register - handles FB/EB/BB mirroring and CSCE
     function Action setReg(RegIdx regIdx, Word data, Integer e);
         action
             case (regIdx)
+                rCYR: begin
+                    data = {data[1], data[15:2], data[0]};
+                end
+                rSR: begin
+                    data = {data[15], data[15:2], data[0]};
+                end
+                rCYL: begin
+                    data = {data[14:1], data[15], data[0]};
+                end
+                rEDOP: begin
+                    data = {8'b0, data[14:8], 1'b0};
+                end
                 // WARNING: This is probably not correct if you're also
                 // writing to rFB.  Should find a way to fix this...
                 rEB: begin

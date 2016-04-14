@@ -35,6 +35,7 @@ function Exec2Writeback exec(ExecFuncArgs args);
         READ: return read(args);
         RETURN: return returnFunc(args);
         // Bunch of stuff here
+        SU: return su(args);
         TC: return tc(args);
         TCF: return tcf(args);
         TS: return ts(args);
@@ -203,9 +204,9 @@ function Exec2Writeback ca(ExecFuncArgs args);
     Word newAcc = is16BitRegM(memAddr) ? memResp : {memResp[15], memResp[15:1]};
 
     return Exec2Writeback {
-        eRes1: 0,
+        eRes1: memResp,
         eRes2: newAcc,
-        memAddrOrIOChannel: tagged None,
+        memAddrOrIOChannel: isCSCE(memAddr) ? (tagged Addr memAddr) : tagged None,
         regNum: tagged Valid rA,
         newZ: args.z + 1
     };
@@ -451,6 +452,23 @@ function Exec2Writeback returnFunc(ExecFuncArgs args);
     };
 endfunction
 
+// SU
+// The "Subtract" instruction subtracts a memory value from the accumulator.
+function Exec2Writeback su(ExecFuncArgs args);
+    Word memResp = fromMaybe(?, args.memOrIOResp);
+    Word aResp = fromMaybe(?, args.regResp);
+
+    Word aSubbed = subOnes(aResp, is16BitRegM(zeroExtend(args.inst[10:1])) ? memResp : signExtend(memResp[15:1]));
+
+    return Exec2Writeback {
+        eRes1: 0,
+        eRes2: aSubbed,
+        memAddrOrIOChannel: tagged None,
+        regNum: tagged Valid rA,
+        newZ: args.z + 1
+    };
+endfunction
+
 // TC
 // The "Transfer Control" (or "Transfer Control setting up a Return") instruction calls a subroutine,
 // first preparing for a later return to the instruction following the TC instruction.
@@ -491,7 +509,7 @@ function Exec2Writeback ts(ExecFuncArgs args);
     // TODO: Handle OVSK properly
     // TAGEXCEPTION
     return Exec2Writeback {
-        eRes1: is16BitRegM(memAddr) ? aResp : signExtend(aResp[15:1]),
+        eRes1: is16BitRegM(memAddr) ? aResp : {aResp[14:0], 1'b0},
         // Bluespec doesn't seem to like {15'b(aResp[15]), 1'b(!aResp[15])}.
         eRes2: hasOverflow ? {top, ~aResp[15]} : aResp,
         memAddrOrIOChannel: tagged Addr memAddr,

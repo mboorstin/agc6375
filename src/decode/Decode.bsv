@@ -46,7 +46,7 @@ function DecodeRes decode(Instruction inst, Bool isExtended);
                     return dUNIMPLEMENTED();
                 end
                 else begin //BZF
-                    return dUNIMPLEMENTED();
+                    return dBZF();
                 end
             end
             opMSU: begin //corresponds to MSU, QXCH, AUG, and DIM
@@ -76,7 +76,7 @@ function DecodeRes decode(Instruction inst, Bool isExtended);
             end
             opSU: begin //corresponds to SU and BZMF
                 if  (qq == qcSU) begin //SU
-                    return dUNIMPLEMENTED();
+                    return dSU(inst);
                 end
                 else begin //BZMF
                     return dUNIMPLEMENTED();
@@ -125,7 +125,7 @@ function DecodeRes decode(Instruction inst, Bool isExtended);
                         return dRegXCH(inst, rL, LXCH);
                     end
                     qcINCR: begin //INCR
-                        return dUNIMPLEMENTED();
+                        return dINCR(inst);
                     end
                     qcADS: begin //ADS
                         return dADS(inst);
@@ -180,6 +180,14 @@ function DecodeRes dADS(Instruction inst);
     };
 endfunction
 
+function DecodeRes dBZF();
+    return DecodeRes {
+        memAddrOrIOChannel: tagged None,
+        regNum: tagged Valid rA,
+        instNum: BZF
+    };
+endfunction
+
 function DecodeRes dCA(Instruction inst);
     return DecodeRes {
         memAddrOrIOChannel: tagged Addr zeroExtend(inst[12:1]),
@@ -209,6 +217,14 @@ function DecodeRes dEXTEND();
         memAddrOrIOChannel: tagged None,
         regNum: tagged Invalid,
         instNum: EXTEND
+    };
+endfunction
+
+function DecodeRes dINCR(Instruction inst);
+    return DecodeRes {
+        memAddrOrIOChannel: tagged Addr zeroExtend(inst[10:1]),
+        regNum: tagged Invalid,
+        instNum: INCR
     };
 endfunction
 
@@ -258,6 +274,14 @@ function DecodeRes dRETURN();
         memAddrOrIOChannel: tagged None,
         regNum: tagged Valid rQ,
         instNum: RETURN
+    };
+endfunction
+
+function DecodeRes dSU(Instruction inst);
+    return DecodeRes {
+        memAddrOrIOChannel: tagged Addr zeroExtend(inst[10:1]),
+        regNum: tagged Valid rA,
+        instNum: SU
     };
 endfunction
 
