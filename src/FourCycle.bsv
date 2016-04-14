@@ -1,4 +1,5 @@
 import AGCMemory::*;
+import ArithUtil::*;
 import Decode::*;
 import Exec::*;
 import Fifo::*;
@@ -32,19 +33,24 @@ module mkAGC(AGC);
     Reg#(Maybe#(Word)) indexAddend <- mkReg(tagged Invalid);
     Reg#(Bool) isExtended <- mkReg(False);
 
-    // TODO: Handle appropriately!
     function Instruction handleIndex(Instruction inst);
-        return inst;
+        if (isValid(indexAddend)) begin
+            return inst + fromMaybe(?, indexAddend);
+        end else begin
+            return inst;
+        end
     endfunction
 
     rule fetch((stage == Fetch) && memory.init.done);
-        $display("\n\nFetch");
+        $display("\n\nFetch---------------------------------------------------------------------------------------------");
         // Get the PC
         Word z = memory.imem.getZ();
 
         // Get the actual address out of Z
         // TAGLSB
         Addr zAddr = z[12:1];
+
+        $display("Instruction address: o%o", zAddr);
 
         // Fire the load request
         memory.imem.req(zAddr);
@@ -57,7 +63,7 @@ module mkAGC(AGC);
     endrule
 
     rule decode((stage == Decode) && memory.init.done);
-        $display("Decode");
+        $display("Decode--------------------------------------------------------------------------------------------");
         // Get the addr from Fetch
         Fetch2Decode last = f2d.first();
         $display("f2d.first: ", fshow(last));
@@ -67,16 +73,23 @@ module mkAGC(AGC);
         Instruction inst <- memory.imem.resp();
 
         // Add the index to it if necessary
+        if (isValid(indexAddend)) begin
+            $display("IndexAddend is valid!");
+        end
         inst = handleIndex(inst);
 
         // Do the decode
         DecodeRes decoded = decode(inst, isExtended);
 
         $display("Decoded instruction: ", fshow(decoded.instNum));
+        if (decoded.instNum == UNIMPLEMENTED) begin
+            $finish();
+        end
 
         // Do the memory and IO requests
         MemOrIODeq deqFromMemOrIO = None;
         if (decoded.memAddrOrIOChannel matches tagged Addr .addr) begin
+           $display("Requesting data load: o%o", addr);
            memory.fetcher.memReq(addr);
            deqFromMemOrIO = Mem;
         end else if (decoded.memAddrOrIOChannel matches tagged IOChannel .channel) begin
@@ -115,7 +128,7 @@ module mkAGC(AGC);
     endrule
 
     rule execute((stage == Exec) && memory.init.done);
-        $display("Execute");
+        $display("Execute-------------------------------------------------------------------------------------------");
         // Get the data from decode
         Decode2Exec last = d2e.first();
         $display("d2e.first: ", fshow(last));
@@ -125,10 +138,10 @@ module mkAGC(AGC);
         // Doing if's because of ActionValue sadness
         Maybe#(Word) memOrIOResp;
         if (last.deqFromMemOrIO == Mem) begin
-            let memResp <- memory.fetcher.memResp();
+            Word memResp <- memory.fetcher.memResp();
             memOrIOResp = tagged Valid memResp;
         end else if (last.deqFromMemOrIO == IO) begin
-            let ioResp <- io.internalIO.readResp();
+            Word ioResp <- io.internalIO.readResp();
             memOrIOResp = tagged Valid ioResp;
         end else begin
             memOrIOResp = tagged Invalid;
@@ -142,9 +155,6 @@ module mkAGC(AGC);
             regResp = tagged Invalid;
         end
 
-        // Set the index addend if necessary
-        indexAddend <= (last.instNum == INDEX) ? memOrIOResp : tagged Invalid;
-
         // Do the actual computations
         ExecFuncArgs execArgs = ExecFuncArgs{
             z: last.z,
@@ -153,7 +163,16 @@ module mkAGC(AGC);
             memOrIOResp: memOrIOResp,
             regResp: regResp
         };
+
+        //Bit#(15) one = 1;
+        //$display("test: ", fshow(subOnes(one, one)));
+
+        $display("execArgs: ", fshow(execArgs));
         Exec2Writeback execRes = exec(execArgs);
+        $display("execRes: ", fshow(execRes));
+
+        // Set the index addend if necessary
+        indexAddend <= (last.instNum == INDEX) ? tagged Valid execRes.eRes1 : tagged Invalid;
 
         // Notifiy writeback
         e2w.enq(execRes);
@@ -163,7 +182,7 @@ module mkAGC(AGC);
     endrule
 
     rule writeback((stage == Writeback) && memory.init.done);
-        $display("Writeback");
+        $display("Writeback-----------------------------------------------------------------------------------------");
         // Get the data from execute
         Exec2Writeback last = e2w.first();
         $display("e2w.first: ", fshow(last));
@@ -187,13 +206,19 @@ module mkAGC(AGC);
     endrule
 
     // Need guards so can't just do interface HostIO hostIO = io
-    interface HostIO hostIO;
-        method ActionValue#(IOPacket) agcToHost if (memory.init.done);
-            IOPacket ret <- io.hostIO.agcToHost();
-            return ret;
-        endmethod
+    interface HostIOWithInit hostIO;
+        interface HostIO hostIO;
+            method ActionValue#(IOPacket) agcToHost if (memory.init.done);
+                IOPacket ret <- io.hostIO.agcToHost();
+                return ret;
+            endmethod
 
-        method Action hostToAGC(IOPacket packet) if ((stage != Init) && memory.init.done);
+            method Action hostToAGC(IOPacket packet) if ((stage != Init) && memory.init.done);
+                io.hostIO.hostToAGC(packet);
+            endmethod
+        endinterface
+
+        method Action init(IOPacket packet) if (!memory.init.done);
             io.hostIO.hostToAGC(packet);
         endmethod
     endinterface

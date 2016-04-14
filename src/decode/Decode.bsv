@@ -22,19 +22,19 @@ function DecodeRes decode(Instruction inst, Bool isExtended);
                         return dWRITE();
                     end
                     qcioRAND: begin //RAND
-                        return ?;
+                        return dUNIMPLEMENTED();
                     end
                     qcioWAND: begin //WAND
-                        return ?;
+                        return dUNIMPLEMENTED();
                     end
                     qcioROR: begin //ROR
-                        return ?;
+                        return dUNIMPLEMENTED();
                     end
                     qcioWOR: begin //WOR
-                        return ?;
+                        return dUNIMPLEMENTED();
                     end
                     qcioRXOR: begin //RXOR
-                        return ?;
+                        return dUNIMPLEMENTED();
                     end
                     qcioEDRUPT: begin //EDRUPT
                         return dEDRUPT();
@@ -43,47 +43,47 @@ function DecodeRes decode(Instruction inst, Bool isExtended);
             end
             opDV: begin //corresponds to DV and BZF
                 if (qq == qcDV) begin //DV
-                    return ?;
+                    return dUNIMPLEMENTED();
                 end
                 else begin //BZF
-                    return ?;
+                    return dUNIMPLEMENTED();
                 end
             end
             opMSU: begin //corresponds to MSU, QXCH, AUG, and DIM
                 case(qq)
                     qcMSU: begin //MSU
-                        return ?;
+                        return dUNIMPLEMENTED();
                     end
                     qcQXCH: begin //QXCH
-                        return ?;
+                        return dRegXCH(inst, rQ, QXCH);
                     end
                     qcAUG: begin //AUG
-                        return ?;
+                        return dUNIMPLEMENTED();
                     end
                     qcDIM: begin //DIM
-                        return ?;
+                        return dUNIMPLEMENTED();
                     end
                 endcase
             end
             opDCA: begin //DCA
-                return ?;
+                return dUNIMPLEMENTED();
             end
             opDCS: begin //DCS
-                return ?;
+                return dUNIMPLEMENTED();
             end
             opINDEX: begin //INDEX
-                return ?;
+                return dINDEXExtended(inst);
             end
             opSU: begin //corresponds to SU and BZMF
                 if  (qq == qcSU) begin //SU
-                    return ?;
+                    return dUNIMPLEMENTED();
                 end
                 else begin //BZMF
-                    return ?;
+                    return dUNIMPLEMENTED();
                 end
             end
             opMP: begin //MP
-                return ?;
+                return dUNIMPLEMENTED();
             end
         endcase
     end
@@ -91,38 +91,41 @@ function DecodeRes decode(Instruction inst, Bool isExtended);
         case (ccc)
             opTC: begin //TC
                 case (inst[12:1])
+                    2: begin // RETURN
+                        return dRETURN();
+                    end
                     3: begin // RELINT
-                        return ?;
+                        return dUNIMPLEMENTED();
                     end
                     4: begin // INHINT
-                        return ?;
+                        return dINHINT();
                     end
                     6: begin // EXTEND
                         return dEXTEND();
                     end
                     default: begin // Everything else
-                        return ?;
+                        return dTC();
                     end
                 endcase
             end
             opCCS: begin //corresponds to CCS and TCF
                 if (qq == qcCCS) begin //CCS
-                    return ?;
+                    return dCCS(inst);
                 end
                 else begin //TCF
-                    return ?;
+                    return dTCF();
                 end
             end
             opDAS: begin //corresponds to DAS, LXCH, INCR, and ADS
                 case (qq)
                     qcDAS: begin //DAS
-                        return ?;
+                        return dUNIMPLEMENTED();
                     end
                     qcLXCH: begin //LXCH
-                        return ?;
+                        return dRegXCH(inst, rL, LXCH);
                     end
                     qcINCR: begin //INCR
-                        return ?;
+                        return dUNIMPLEMENTED();
                     end
                     qcADS: begin //ADS
                         return dADS(inst);
@@ -133,32 +136,40 @@ function DecodeRes decode(Instruction inst, Bool isExtended);
                 return dCA(inst);
             end
             opCS: begin //CS
-                return?;
+                return dUNIMPLEMENTED();
             end
             opINDEX: begin //corresponds to INDEX, DXCH, TS, XCH
                 case (qq)
                     qcINDEX: begin //INDEX
-                        return ?;
+                        return dINDEXBasic(inst);
                     end
                     qcDXCH: begin //DXCH
-                        return ?;
+                        return dUNIMPLEMENTED();
                     end
                     qcTS: begin //TS
-                        return ?;
+                        return dTS();
                     end
                     qcXCH: begin //XCH
-                        return ?;
+                        return dRegXCH(inst, rA, XCH);
                     end
                 endcase
             end
             opAD: begin //AD
-                return?;
+                return dAD(inst);
             end
             opMASK: begin //MASK
-                return ?;
+                return dMASK(inst);
             end
         endcase
     end
+endfunction
+
+function DecodeRes dAD(Instruction inst);
+    return DecodeRes {
+        memAddrOrIOChannel: tagged Addr zeroExtend(inst[12:1]),
+        regNum: tagged Valid rA,
+        instNum: AD
+    };
 endfunction
 
 function DecodeRes dADS(Instruction inst);
@@ -174,6 +185,14 @@ function DecodeRes dCA(Instruction inst);
         memAddrOrIOChannel: tagged Addr zeroExtend(inst[12:1]),
         regNum: tagged Invalid,
         instNum: CA
+    };
+endfunction
+
+function DecodeRes dCCS(Instruction inst);
+    return DecodeRes {
+        memAddrOrIOChannel: tagged Addr zeroExtend(inst[10:1]),
+        regNum: tagged Invalid,
+        instNum: CCS
     };
 endfunction
 
@@ -193,6 +212,79 @@ function DecodeRes dEXTEND();
     };
 endfunction
 
+function DecodeRes dINDEXBasic(Instruction inst);
+    return DecodeRes {
+        memAddrOrIOChannel: tagged Addr zeroExtend(inst[10:1]),
+        regNum: tagged Invalid,
+        instNum: INDEX
+    };
+endfunction
+
+function DecodeRes dINDEXExtended(Instruction inst);
+    return DecodeRes {
+        memAddrOrIOChannel: tagged Addr inst[12:1],
+        regNum: tagged Invalid,
+        instNum: INDEX
+    };
+endfunction
+
+// For now, completely ignoring interrupts
+function DecodeRes dINHINT();
+    return DecodeRes {
+        memAddrOrIOChannel: tagged None,
+        regNum: tagged Invalid,
+        instNum: INHINT
+    };
+endfunction
+
+function DecodeRes dMASK(Instruction inst);
+    return DecodeRes {
+        memAddrOrIOChannel: tagged Addr inst[12:1],
+        regNum: tagged Valid rA,
+        instNum: MASK
+    };
+endfunction
+
+function DecodeRes dRegXCH(Instruction inst, RegIdx regNum, InstNum instNum);
+    return DecodeRes {
+        memAddrOrIOChannel: tagged Addr zeroExtend(inst[10:1]),
+        regNum: tagged Valid regNum,
+        instNum: instNum
+    };
+endfunction
+
+function DecodeRes dRETURN();
+    return DecodeRes {
+        memAddrOrIOChannel: tagged None,
+        regNum: tagged Valid rQ,
+        instNum: RETURN
+    };
+endfunction
+
+function DecodeRes dTC();
+    return DecodeRes {
+        memAddrOrIOChannel: tagged None,
+        regNum: tagged Valid rZ,
+        instNum: TC
+    };
+endfunction
+
+function DecodeRes dTCF();
+    return DecodeRes {
+        memAddrOrIOChannel: tagged None,
+        regNum: tagged Invalid,
+        instNum: TCF
+    };
+endfunction
+
+function DecodeRes dTS();
+    return DecodeRes {
+        memAddrOrIOChannel: tagged None,
+        regNum: tagged Valid rA,
+        instNum: TS
+    };
+endfunction
+
 function DecodeRes dREAD(Instruction inst);
     return DecodeRes {
         memAddrOrIOChannel: tagged IOChannel inst[7:1],
@@ -206,5 +298,13 @@ function DecodeRes dWRITE();
         memAddrOrIOChannel: tagged None,
         regNum: tagged Valid rA,
         instNum: WRITE
+    };
+endfunction
+
+function DecodeRes dUNIMPLEMENTED();
+    return DecodeRes {
+        memAddrOrIOChannel: tagged None,
+        regNum: tagged Invalid,
+        instNum: UNIMPLEMENTED
     };
 endfunction

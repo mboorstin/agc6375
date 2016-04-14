@@ -30,12 +30,12 @@ module mkMemAndRegWrapper(BRAMServer#(MemAddr, Word) bramPort, Vector#(NRegs, Eh
                 // writing to rFB.  Should find a way to fix this...
                 rEB: begin
                     Bit#(3) eb = truncate(data >> 9);
-                    $display("Mirroring from rEB: %x", eb);
+                    $display("Mirroring from rEB: o%o", eb);
                     regFile[rBB][e] <= {truncateLSB(getReg(rBB, e)), eb, 1'b0};
                 end
                 rFB: begin
                     Bit#(5) fb = truncateLSB(data);
-                    $display("Mirroring from rFB: %x", fb);
+                    $display("Mirroring from rFB: o%o", fb);
                     regFile[rBB][e] <= {fb, truncate(getReg(rBB, e))};
                 end
                 rBB: begin
@@ -56,7 +56,7 @@ module mkMemAndRegWrapper(BRAMServer#(MemAddr, Word) bramPort, Vector#(NRegs, Eh
         if (realAddr matches tagged RegNum .r) begin
             memDelayed.enq(getReg(r, readIdx));
         end else begin
-            $display("readMem: addr %x", realAddr.MemAddr);
+            $display("readMem: addr o%o", realAddr.MemAddr);
             bramPort.request.put(BRAMRequest{
                 write: False,
                 responseOnWrite: False,
@@ -81,7 +81,7 @@ module mkMemAndRegWrapper(BRAMServer#(MemAddr, Word) bramPort, Vector#(NRegs, Eh
             return memDelayed.first;
         end else begin
             Instruction ret <- bramPort.response.get;
-            $display("memResp: from mem: %x", ret);
+            $display("memResp: from mem: o%o", ret);
             return ret;
         end
     endmethod
@@ -94,9 +94,10 @@ module mkMemAndRegWrapper(BRAMServer#(MemAddr, Word) bramPort, Vector#(NRegs, Eh
     // Add error checking!
     method Action writeMem(RealMemAddr realAddr, Word data);
         if (realAddr matches tagged RegNum .r) begin
+            $display("writeMem; addr o%o  data o%o", r, data);
             setReg(r, data, writeMemIdx);
         end else begin
-            $display("writeMem: addr %x  data %x", realAddr.MemAddr, data);
+            $display("writeMem: addr o%o  data o%o", realAddr.MemAddr, data);
             bramPort.request.put(BRAMRequest{
                 write: True,
                 responseOnWrite: False,
@@ -107,12 +108,12 @@ module mkMemAndRegWrapper(BRAMServer#(MemAddr, Word) bramPort, Vector#(NRegs, Eh
     endmethod
 
     method Action writeReg(RegIdx idx, Word data);
-        $display("writeReg: regNum %d  data %x", idx, data);
+        $display("writeReg: regNum %d  data o%o", idx, data);
         setReg(idx, data, writeRegIdx);
     endmethod
 
     method Action writeZImm(Word data);
-        $display("writeZImm: data %x", data);
+        $display("writeZImm: data o%o", data);
         setReg(rZ, data, writeZIdx);
     endmethod
 

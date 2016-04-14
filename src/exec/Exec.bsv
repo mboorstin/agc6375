@@ -10,7 +10,7 @@ TAGEXCEPTION: places with overflows/other exceptions to be implemented
 
 */
 
-(* noinline *)
+//(* noinline *)
 function Exec2Writeback exec(ExecFuncArgs args);
     case (args.instNum)
         AD: return ad(args);
@@ -24,14 +24,24 @@ function Exec2Writeback exec(ExecFuncArgs args);
         DIM: return dim(args);
         // Bunch of double's here
         INCR: return incr(args);
+        INDEX: return index(args);
         // Bunch of other stuff here
-        LXCH: return lxch(args);
+        INHINT: return inhint(args);
+        LXCH: return regXCH(args, rL);
         MASK: return mask(args);
         // Bunch of stuff here
+        QXCH: return regXCH(args, rQ);
+        // Bunch of stuff here
         READ: return read(args);
+        RETURN: return returnFunc(args);
+        // Bunch of stuff here
+        TC: return tc(args);
+        TCF: return tcf(args);
+        TS: return ts(args);
         // Bunch of stuff here
         WRITE: return write(args);
-
+        XCH: return regXCH(args, rA);
+        // Bunch of stuff here
         // Once we're done with everything, should turn into a
         // raise unimplemented error
         default: return unimplemented(args);
@@ -186,7 +196,7 @@ endfunction
 // The "Clear and Add" (or "Clear and Add Erasable" or "Clear and Add Fixed")
 // instruction moves the contents of a memory location into the accumulator.
 function Exec2Writeback ca(ExecFuncArgs args);
-    Word memResp = fromMaybe(?, args.memOrIOResp);
+    Word memResp = fromMaybe('hdead, args.memOrIOResp);
     Addr memAddr = args.inst[12:1]; // TAGLSB
 
     // TAGLSB
@@ -211,13 +221,10 @@ function Exec2Writeback ccs(ExecFuncArgs args);
 
     Bool is16Bits = is16BitRegM(memAddr);
 
+    Word memRespCleaned = is16Bits ? memResp : {memResp[15], memResp[15:1]};
+
     // This makes two copies of the dABS logic - can we do better?
-    Word dabs;
-    if (is16Bits) begin
-        dabs = dABS(memResp);
-    end else begin
-        dabs = {dABS(memResp[15:1]), 0};
-    end
+    Word dabs = dABS(memRespCleaned);
 
     // I think this is the correct interpretation of how to handle overflow here: just
     // ignore the fact that it exists, and treat A, L, and Q as 16 bits.  We basically treat
@@ -232,13 +239,13 @@ function Exec2Writeback ccs(ExecFuncArgs args);
     // the 16 bit value 1111111111111110 falls through to < -0, which saves us an A/L/Q fix,
     // even though it "should" be == -0
     // == +0
-    if (dabs[15:1] == 0) begin
+    if (memRespCleaned[15:1] == 0) begin
         addend = 2;
     // == -0
-    end else if (dabs[15:1] == {1'b1, 0}) begin
+    end else if (memRespCleaned[15:1] == {1'b1, 0}) begin
         addend = 4;
     // > +0
-    end else if (dabs[15] == 0) begin
+    end else if (memRespCleaned[15] == 0) begin
         addend = 1;
     // < -0
     end else begin
@@ -348,12 +355,41 @@ function Exec2Writeback incr(ExecFuncArgs args);
     };
 endfunction
 
-// LXCH
-// The "Exchange L and K" instruction exchanges the value in the L register with a
-// value stored in erasable memory.
-function Exec2Writeback lxch(ExecFuncArgs args);
+// INDEX
+// Note that eRes1 is added to the next instruction.
+function Exec2Writeback index(ExecFuncArgs args);
     Word memResp = fromMaybe(?, args.memOrIOResp);
-    Word lResp = fromMaybe(?, args.regResp);
+
+    // TAGEXCEPTION
+    Word toAdd = is16BitRegM(zeroExtend(args.inst[10:1])) ? {memResp[14:0], 0} : memResp;
+
+    return Exec2Writeback {
+        eRes1: toAdd,
+        eRes2: 0,
+        memAddrOrIOChannel: tagged None,
+        regNum: tagged Invalid,
+        newZ: args.z + 1
+    };
+endfunction
+
+// INHINT
+// Disable interrupts.  For now, doing nothing.
+function Exec2Writeback inhint(ExecFuncArgs args);
+    return Exec2Writeback {
+        eRes1: 0,
+        eRes2: 0,
+        memAddrOrIOChannel: tagged None,
+        regNum: tagged Invalid,
+        newZ: args.z + 1
+    };
+endfunction
+
+// XCH, LXCH and QXCH
+// The "Exchange A/L/Q and K" instruction exchanges the value in the A/L/Q register with a
+// value stored in erasable memory.
+function Exec2Writeback regXCH(ExecFuncArgs args, RegIdx regNum);
+    Word memResp = fromMaybe(?, args.memOrIOResp);
+    Word rResp = fromMaybe(?, args.regResp);
 
     Addr memAddr = {2'b0, args.inst[10:1]};
 
@@ -362,13 +398,13 @@ function Exec2Writeback lxch(ExecFuncArgs args);
     // TAGLSB
     Word newL = is16Bits ? memResp : signExtend(memResp[15:1]);
     // TAGEXCEPTION
-    Word newMem = is16Bits ? lResp : {lResp[14:0], 0};
+    Word newMem = is16Bits ? rResp : {rResp[14:0], 0};
 
     return Exec2Writeback {
         eRes1: newMem,
         eRes2: newL,
         memAddrOrIOChannel: tagged Addr memAddr,
-        regNum: tagged Valid rL,
+        regNum: tagged Valid regNum,
         newZ: args.z + 1
     };
 endfunction
@@ -398,6 +434,69 @@ function Exec2Writeback mask(ExecFuncArgs args);
         memAddrOrIOChannel: tagged None,
         regNum: tagged Valid rA,
         newZ: args.z + 1
+    };
+endfunction
+
+// RETURN
+// This is really a special case of TC
+function Exec2Writeback returnFunc(ExecFuncArgs args);
+    Addr newAddr = truncate(fromMaybe(?, args.regResp));
+
+    return Exec2Writeback {
+        eRes1: 0,
+        eRes2: 0,
+        memAddrOrIOChannel: tagged None,
+        regNum: tagged Invalid,
+        newZ: newAddr
+    };
+endfunction
+
+// TC
+// The "Transfer Control" (or "Transfer Control setting up a Return") instruction calls a subroutine,
+// first preparing for a later return to the instruction following the TC instruction.
+function Exec2Writeback tc(ExecFuncArgs args);
+    Word zData = fromMaybe(?, args.regResp);
+
+    return Exec2Writeback {
+        eRes1: 0,
+        eRes2: {zData[15], zData[15:1]} + 1,
+        memAddrOrIOChannel: tagged None,
+        regNum: tagged Valid rQ,
+        newZ: args.inst[12:1]
+    };
+endfunction
+
+// TCF
+// The "Transfer Control to Fixed" instruction jumps to a memory location in fixed
+// (as opposed to erasable) memory.
+function Exec2Writeback tcf(ExecFuncArgs args);
+    return Exec2Writeback {
+        eRes1: 0,
+        eRes2: 0,
+        memAddrOrIOChannel: tagged None,
+        regNum: tagged Invalid,
+        newZ: args.inst[12:1]
+    };
+endfunction
+
+// TS
+//The "Transfer to Storage" instruction copies the accumulator into memory ... and so much more.
+function Exec2Writeback ts(ExecFuncArgs args);
+    Word aResp = fromMaybe(?, args.regResp);
+    Bool hasOverflow = (aResp[15] != aResp[14]);
+    Addr memAddr = {2'b0, args.inst[10:1]};
+
+    Bit#(15) top = signExtend(aResp[15]);
+
+    // TODO: Handle OVSK properly
+    // TAGEXCEPTION
+    return Exec2Writeback {
+        eRes1: is16BitRegM(memAddr) ? aResp : signExtend(aResp[15:1]),
+        // Bluespec doesn't seem to like {15'b(aResp[15]), 1'b(!aResp[15])}.
+        eRes2: hasOverflow ? {top, ~aResp[15]} : aResp,
+        memAddrOrIOChannel: tagged Addr memAddr,
+        regNum: tagged Valid rA,
+        newZ: hasOverflow ? (args.z + 2) : (args.z + 1)
     };
 endfunction
 

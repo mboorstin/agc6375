@@ -9,8 +9,9 @@ module mkAGCIO(AGCIO);
     // We use a 128 word BRAM to buffer the state of the IO
     // channels, since we obviously can't have a bunch of physical
     // wires that the AGC can read from at will
+    // Note that we use the same convention as main memory: bottom bit is parity.
+    // This is initialized by the testbench.
     BRAM_Configure cfg = defaultValue;
-    // TODO: Does this need to be initialized?
     BRAM2Port#(IOChannel, Word) ioBuffer <- mkBRAM2Server(cfg);
 
     // It's important to use a bypass FIFO here so requests
@@ -33,7 +34,7 @@ module mkAGCIO(AGCIO);
                 write: True,
                 responseOnWrite: False,
                 address: packet.channel,
-                datain: packet.data
+                datain: {packet.data[14:0], 1'b0}
             });
         endmethod
     endinterface
@@ -55,7 +56,7 @@ module mkAGCIO(AGCIO);
         endmethod
 
         method Action write(IOChannel channel, Word data);
-            agcToHostQ.enq(IOPacket{channel: channel, data: data});
+            agcToHostQ.enq(IOPacket{channel: channel, data: {1'b0, data[15:1]}});
             ioBuffer.portB.request.put(BRAMRequest{
                 write: True,
                 responseOnWrite: False,

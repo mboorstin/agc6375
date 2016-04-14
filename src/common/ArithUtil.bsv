@@ -283,7 +283,7 @@ function DP divide (DP a, SP b);
     end
     //
 
-    
+
 
     return dp;
 endfunction
@@ -309,5 +309,5 @@ function Bit#(n) dABS(Bit#(n) x);
     // If is negative, make positive
     Bit#(TSub#(n, 1)) abs = (x[valueOf(TSub#(n, 1))] == 1) ? ~truncate(x) : truncate(x);
     // Subtract one if appropriate
-    return zeroExtend((abs == 0) ? abs : subOnes(abs, 1));
+    return zeroExtend(((abs == 0) || (abs == 1)) ? 0 : subOnes(abs, 1));
 endfunction

@@ -26,6 +26,16 @@
 // socket talking to yaDSKY2, but it still seems sketchy.  The sharing of dskyFD is
 // scary and terrible.
 
+// Initialize the I/O buffers on the AGC.  For now, only need 1A=4000, which we send as 2000.
+void initIO(InportProxyT<IOPacket>* ioInit) {
+    IOPacket initMessage;
+
+    // Should do something fancier if necessary
+    initMessage.m_channel = 032;
+    initMessage.m_data = 0x2000;
+    ioInit->sendMessage(initMessage);
+}
+
 // Initialize the AGC's BRAM to the contents of the given program
 // Note that this needs to use REAL addresses so that we don't have to
 // worry about changing the state of rEB, rFB, and rBB.
@@ -148,11 +158,12 @@ void* runDSKYListener(void* arg) {
         while (true) {
             if (read(dskyFD, &inBuf, sizeof(DSKYPacket)) < sizeof(DSKYPacket)) {
                 fprintf(stderr, "Error reading from socket!\n");
+                close(dskyFD);
                 break;
             }
 
-            fprintf(stderr, "Received data from yaDSKY2!\n");
             dskyPacketToIOPacket(&inBuf, &outBuf);
+            fprintf(stderr, "Received data from yaDSKY2: channel o%o  data 0x%x\n", (unsigned int) outBuf.m_channel, (unsigned int) outBuf.m_data);
             args->ioHostToAGC->sendMessage(outBuf);
         }
     }
@@ -170,7 +181,7 @@ void* runAGCListener(void* arg) {
 
     while (true) {
         IOPacket packet = args->ioAGCToHost->getMessage();
-        printf("Received data from AGC!\n");
+        printf("Received data from AGC: channel o%o  data 0x%x\n", (unsigned int) packet.m_channel, (unsigned int) packet.m_data);
         ioPacketToDSKYPacket(&packet, &outBuf);
         if (!(*(args->dskyFD)) || (write(*(args->dskyFD), &outBuf, sizeof(DSKYPacket)) < 0)) {
             fprintf(stderr, "Error writing to socket!\n");
@@ -188,7 +199,9 @@ void exitCleanly(ShutdownXactor* shutdown, SceMiServiceThread* scemiServiceThrea
 
     // Ie, not null or error opening
     if (serverFD > 0) {
+        printf("Trying to close\n");
         close(serverFD);
+        printf("Closed!\n");
     }
 
     exit(ret);
@@ -216,6 +229,7 @@ int main(int argc, char* argv[]) {
     // Initialize the SceMi ports
     OutportQueueT<IOPacket> ioAGCToHost("", "scemi_ioAGCToHost_outport", sceMi);
     InportProxyT<IOPacket> ioHostToAGC("", "scemi_ioHostToAGC_inport", sceMi);
+    InportProxyT<IOPacket> ioInit("", "scemi_ioInit_inport", sceMi);
     InportProxyT<Addr> start("", "scemi_start_inport", sceMi);
     InportProxyT<MemInit> memInit("", "scemi_memInit_inport", sceMi);
 
@@ -227,6 +241,9 @@ int main(int argc, char* argv[]) {
 
     // Make sure the AGC is reset
     reset.reset();
+
+    // Initialize the I/O buffer
+    initIO(&ioInit);
 
     // Initialize the FPGA memory
     if (initMem((argc == 2) ? argv[1] : NULL, &memInit) != 0) {

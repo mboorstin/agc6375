@@ -44,9 +44,16 @@ interface HostIO;
     method Action hostToAGC(IOPacket packet);
 endinterface
 
+interface HostIOWithInit;
+    // Main I/O
+    interface HostIO hostIO;
+    // Init
+    method Action init(IOPacket packet);
+endinterface
+
 interface AGC;
     // I/O
-    interface HostIO hostIO;
+    interface HostIOWithInit hostIO;
 
     // Start the simulation
     // Can maybe replace this with an ioHostToAGC call,
@@ -244,6 +251,8 @@ typedef enum {
     RXOR,
     EDRUPT,
     INHINT,
+    RETURN,
     RELINT,
-    EXTEND
+    EXTEND,
+    UNIMPLEMENTED
 } InstNum deriving (Eq, Bits, FShow);
