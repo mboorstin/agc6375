@@ -136,7 +136,7 @@ function DecodeRes decode(Instruction inst, Bool isExtended);
                 return dCA(inst);
             end
             opCS: begin //CS
-                return dUNIMPLEMENTED();
+                return dCS(inst);
             end
             opINDEX: begin //corresponds to INDEX, DXCH, TS, XCH
                 case (qq)
@@ -190,7 +190,7 @@ endfunction
 
 function DecodeRes dCA(Instruction inst);
     return DecodeRes {
-        memAddrOrIOChannel: tagged Addr zeroExtend(inst[12:1]),
+        memAddrOrIOChannel: tagged Addr inst[12:1],
         regNum: tagged Invalid,
         instNum: CA
     };
@@ -201,6 +201,14 @@ function DecodeRes dCCS(Instruction inst);
         memAddrOrIOChannel: tagged Addr zeroExtend(inst[10:1]),
         regNum: tagged Invalid,
         instNum: CCS
+    };
+endfunction
+
+function DecodeRes dCS(Instruction inst);
+    return DecodeRes {
+        memAddrOrIOChannel: tagged Addr inst[12:1],
+        regNum: tagged Invalid,
+        instNum: CS
     };
 endfunction
 

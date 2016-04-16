@@ -62,6 +62,7 @@ function Exec2Writeback ad(ExecFuncArgs args);
 
     Word mem_resp = fromMaybe(?, args.memOrIOResp);
     Word reg_resp = fromMaybe(?, args.regResp);
+    Addr memAddr = args.inst[12:1];
 
 
     //mem_resp is the value to be added to the accumulator.
@@ -76,9 +77,9 @@ function Exec2Writeback ad(ExecFuncArgs args);
 
     //return
     Exec2Writeback e2w = Exec2Writeback{
-        eRes1:16'b0,
+        eRes1: mem_resp,
         eRes2:sum, //write sum back to accumulator only
-        memAddrOrIOChannel: tagged None,
+        memAddrOrIOChannel: isCSCE(memAddr) ? (tagged Addr memAddr) : tagged None,
         regNum: tagged Valid rA, //accumulator
         newZ: args.z + 1
     };
@@ -259,9 +260,9 @@ function Exec2Writeback ccs(ExecFuncArgs args);
     end
 
     return Exec2Writeback {
-        eRes1: 0,
+        eRes1: memResp,
         eRes2: dabs,
-        memAddrOrIOChannel: tagged None,
+        memAddrOrIOChannel: isCSCE(memAddr) ? (tagged Addr memAddr) : tagged None,
         regNum: tagged Valid rA,
         newZ: args.z + addend
     };
@@ -281,9 +282,9 @@ function Exec2Writeback cs(ExecFuncArgs args);
     Word acc = is16BitRegM(memAddr) ? {upper, ~memResp[0]} : signExtend(upper);
 
     return Exec2Writeback {
-        eRes1: 0,
+        eRes1: memResp,
         eRes2: acc,
-        memAddrOrIOChannel: tagged None,
+        memAddrOrIOChannel: isCSCE(memAddr) ? (tagged Addr memAddr) : tagged None,
         regNum: tagged Valid rA,
         newZ: args.z + 1
     };
@@ -357,17 +358,20 @@ function Exec2Writeback incr(ExecFuncArgs args);
 endfunction
 
 // INDEX
-// Note that eRes1 is added to the next instruction.
+// Note that eRes2 is added to the next instruction.
 function Exec2Writeback index(ExecFuncArgs args);
     Word memResp = fromMaybe(?, args.memOrIOResp);
+    // This is not stricly correct, because is 12 bits when INDEX is used as an extracode,
+    // but we only use it for is16BItRegM and isCSCE.
+    Addr memAddr = zeroExtend(args.inst[10:1]);
 
     // TAGEXCEPTION
-    Word toAdd = is16BitRegM(zeroExtend(args.inst[10:1])) ? {memResp[14:0], 0} : memResp;
+    Word toAdd = is16BitRegM(memAddr) ? {memResp[14:0], 0} : memResp;
 
     return Exec2Writeback {
-        eRes1: toAdd,
-        eRes2: 0,
-        memAddrOrIOChannel: tagged None,
+        eRes1: memResp,
+        eRes2: toAdd,
+        memAddrOrIOChannel: isCSCE(memAddr) ? (tagged Addr memAddr) : tagged None,
         regNum: tagged Invalid,
         newZ: args.z + 1
     };
@@ -457,13 +461,14 @@ endfunction
 function Exec2Writeback su(ExecFuncArgs args);
     Word memResp = fromMaybe(?, args.memOrIOResp);
     Word aResp = fromMaybe(?, args.regResp);
+    Addr memAddr = zeroExtend(args.inst[10:1]);
 
-    Word aSubbed = subOnes(aResp, is16BitRegM(zeroExtend(args.inst[10:1])) ? memResp : signExtend(memResp[15:1]));
+    Word aSubbed = subOnes(aResp, is16BitRegM(memAddr) ? memResp : signExtend(memResp[15:1]));
 
     return Exec2Writeback {
-        eRes1: 0,
+        eRes1: memResp,
         eRes2: aSubbed,
-        memAddrOrIOChannel: tagged None,
+        memAddrOrIOChannel: isCSCE(memAddr) ? (tagged Addr memAddr) : tagged None,
         regNum: tagged Valid rA,
         newZ: args.z + 1
     };

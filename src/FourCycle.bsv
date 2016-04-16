@@ -173,7 +173,7 @@ module mkAGC(AGC);
         $display("execRes: ", fshow(execRes));
 
         // Set the index addend if necessary
-        indexAddend <= (last.instNum == INDEX) ? tagged Valid execRes.eRes1 : tagged Invalid;
+        indexAddend <= (last.instNum == INDEX) ? tagged Valid execRes.eRes2 : tagged Invalid;
 
         // Notifiy writeback
         e2w.enq(execRes);
