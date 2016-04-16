@@ -161,7 +161,7 @@ function Exec2Writeback bzf(ExecFuncArgs args);
 
     Bool doBranch = (acc[15] == acc[14]) && ((acc[14:0] == 0) || (acc[14:0] == ~0));
 
-    Addr newZ = doBranch ? args.inst[12:1] : (args.z + 1);
+    Addr newZ = (doBranch ? args.inst[12:1] : args.z) + 1;
 
     return Exec2Writeback {
         eRes1: 0,
@@ -182,7 +182,7 @@ function Exec2Writeback bzmf(ExecFuncArgs args);
 
     Bool doBranch = (acc[15] == acc[14]) ? ((acc[14:0] == 0) || acc[14] == 1) : (acc[15:14] == 2'b10);
 
-    Addr newZ = doBranch ? args.inst[12:1] : (args.z + 1);
+    Addr newZ = (doBranch ? args.inst[12:1] : args.z) + 1;
 
     return Exec2Writeback {
         eRes1: 0,
@@ -448,7 +448,7 @@ function Exec2Writeback returnFunc(ExecFuncArgs args);
         eRes2: 0,
         memAddrOrIOChannel: tagged None,
         regNum: tagged Invalid,
-        newZ: newAddr
+        newZ: newAddr + 1
     };
 endfunction
 
@@ -477,10 +477,12 @@ function Exec2Writeback tc(ExecFuncArgs args);
 
     return Exec2Writeback {
         eRes1: 0,
-        eRes2: {zData[15], zData[15:1]} + 1,
+        // Note that "The Q register is set up with the address following the instruction.",
+        // and Z already has the address following the instruction.
+        eRes2: {zData[15], zData[15:1]},
         memAddrOrIOChannel: tagged None,
         regNum: tagged Valid rQ,
-        newZ: args.inst[12:1]
+        newZ: args.inst[12:1] + 1
     };
 endfunction
 
@@ -493,7 +495,7 @@ function Exec2Writeback tcf(ExecFuncArgs args);
         eRes2: 0,
         memAddrOrIOChannel: tagged None,
         regNum: tagged Invalid,
-        newZ: args.inst[12:1]
+        newZ: args.inst[12:1] + 1
     };
 endfunction
 

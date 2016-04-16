@@ -46,14 +46,15 @@ module mkAGC(AGC);
         // Get the PC
         Word z = memory.imem.getZ();
 
-        // Get the actual address out of Z
+        // Get the actual address out of Z.  Z always holds the next address.
         // TAGLSB
         Addr zAddr = z[12:1];
+        Addr zAddrToFetch = subOnes(zAddr, 1);
 
-        $display("Instruction address: o%o", zAddr);
+        $display("Instruction address: o%o", zAddrToFetch);
 
         // Fire the load request
-        memory.imem.req(zAddr);
+        memory.imem.req(zAddrToFetch);
 
         // Notify decode of the address
         f2d.enq(Fetch2Decode{z: zAddr});

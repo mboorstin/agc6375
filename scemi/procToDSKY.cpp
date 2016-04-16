@@ -10,7 +10,8 @@
 #include "SceMiHeaders.h"
 #include "ResetXactor.h"
 
-#define AGC_START_IP 04000
+// It actually starts at 4000, but Z always points to the next instruction
+#define AGC_START_IP 04001
 #define DSKY_PORT 19797
 #define FIXED_MEM_START 2048
 #define FIXED_MEM_BANK_2 4096
