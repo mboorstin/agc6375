@@ -8,6 +8,15 @@ module mkArithUtilTest ();
     //state
     Reg#(Bool) started <- mkReg(False);
     Reg#(Bool) done <- mkReg(False);
+    Reg#(Bool) testing_module <- mkReg(True); //is this testbench currently testing a module?
+    Reg#(Bool) requesting <- mkReg(True);
+    Reg#(DP) curr_dpin1 <- mkReg(30'b0);
+    Reg#(DP) curr_dpin2 <- mkReg(30'b0);
+    Reg#(SP) curr_spin1 <- mkReg(15'b0);
+    Reg#(SP) curr_spin2 <- mkReg(15'b0);
+    Reg#(Bit#(6)) counter <- mkReg(6'b0);
+
+    Divider divider <- mkDivider();
 
     //test inputs
     Vector#(10, SP) spin1 = newVector;
@@ -36,7 +45,7 @@ module mkArithUtilTest ();
 
     Vector#(10, DP) dpin1 = newVector;
     dpin1[0] = 30'o00000_00000;
-    dpin1[1] = 30'o00001_00001;
+    dpin1[1] = 30'o00000_77777;
     dpin1[2] = 30'o00001_00001;
     dpin1[3] = 30'o00010_10000;
     dpin1[4] = 30'o77777_40000;
@@ -44,7 +53,7 @@ module mkArithUtilTest ();
     dpin1[6] = 30'o00000_00001;
     dpin1[7] = 30'o40300_45600;
     dpin1[8] = 30'o00000_00000;
-    dpin1[9] = 30'o77777_77776;
+    dpin1[9] = 30'o77777_00000;
     Vector#(10, Fmt) fmt1 = newVector;
     for (Integer i = 0; i < 10; i = i + 1) begin
         fmt1[i] = $format("(") + displayDecimal(dpin1[i][29:15]) + $format(",    ") + displayDecimal(dpin1[i][14:0]) + $format(")");
@@ -72,7 +81,7 @@ module mkArithUtilTest ();
         started <= True;
     endrule
     
-    rule one_in (started && !done);
+    rule one_in (started && !done && !testing_module);
         //send in data
         for (Integer i = 0; i < 10; i = i + 1) begin
             //Bit#(1) lead1 = truncateLSB(spin1[i]);
@@ -80,7 +89,7 @@ module mkArithUtilTest ();
             //Bit#(16) result0 = addOnes({lead1, spin1[i]}, {lead2,spin2[i]});
             //SP result = overflowCorrect(result0);
             //DP result = addDP(dpin1[i], dpin2[i]);
-            //DP result = makeConsistentSign(dpin1[i]);
+            
 
             //toTwos and toOnes test
             /*SP twos = toTwos(spin2[i]);
@@ -102,18 +111,24 @@ module mkArithUtilTest ();
             //overflow addition test
             //SP result = addOnesOverflow(spin1[i], spin2[i]);
             
-            //division test
-            DP quot1 = divide(dpin1[i], spin1[i]);
+            //slow division test
+            /*DP quot1 = divideSlow(dpin1[i], spin1[i]);
             $display(displayDecimal({dpin1[i][29:15], dpin1[i][13:0]}), "    /    ", displayDecimal(spin1[i]));
             $display($format("(") + displayDecimal(quot1[29:15]) + $format(",    ") + displayDecimal(quot1[14:0]) + $format(")"));
             $display("");
 
-            DP quot2 = divide(dpin2[i], spin2[i]);
+            DP quot2 = divideSlow(dpin2[i], spin2[i]);
             $display(displayDecimal({dpin2[i][29:15], dpin2[i][13:0]}), "    /    ", displayDecimal(spin2[i]));
             $display($format("(") + displayDecimal(quot2[29:15]) + $format(",    ") + displayDecimal(quot2[14:0]) + $format(")"));
-            $display("");
+            $display("");*/
 
-            //Fmt fmt_result = $format("(") + displayDecimal(result[29:15]) + $format(",    ") + displayDecimal(result[14:0]) + $format(")");
+            //consistent sign test
+            /*DP result = makeConsistentSign(dpin1[i]);
+            Fmt fmt_result = $format("(") + displayDecimal(result[29:15]) + $format(",    ") + displayDecimal(result[14:0]) + $format(")");
+            $display(fmt1[i], $format(" => "), fmt_result);*/
+
+
+
             //$display(displayDecimal(spin1[i]), $format("    +    "), displayDecimal(spin2[i]), $format("    =    "), displayDecimal(result));
             //$display("%b", spin2[i]);
             //$display(displayDecimal(spin2[i]));
@@ -123,6 +138,41 @@ module mkArithUtilTest ();
             //$display(fmt1[i], $format("    +    "), fmt2[i], $format("    =    "), fmt_result);
         end
         done <= True;
+    endrule
+
+    rule request (started && requesting && testing_module);
+
+        //divide test
+        Fmt curr_dfmt1 = $format("(") + displayDecimal(curr_dpin1[29:15]) + $format(",    ") + displayDecimal(curr_dpin1[14:0]) + $format(")");
+        Fmt curr_sfmt1 = displayDecimal(curr_spin1);
+        $display(curr_dfmt1, $format(" / "), curr_sfmt1);
+        divider.req(curr_dpin1, curr_spin1);
+        
+
+        requesting <= False;
+    endrule
+
+    rule respond (started && !requesting && testing_module);
+        //catch answers
+        DP out <- divider.resp();
+        SP quo = truncateLSB(out);
+        SP rem = truncate(out);
+
+        Fmt quo_fmt = displayDecimal(quo);
+        Fmt rem_fmt = displayDecimal(rem);
+
+        $display($format(" = "), quo_fmt, $format(" , "), rem_fmt);
+        $display("");
+
+        requesting <= True;
+
+        curr_dpin1 <= curr_dpin1 + 30'o03323_05514;
+        curr_spin1 <= curr_spin1 + 15'o07365;
+        counter <= counter + 1;
+
+        if (counter == 6'd20) begin
+            done <= True;
+        end
     endrule
 
     //all done!
