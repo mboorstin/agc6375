@@ -141,9 +141,12 @@ struct RunDSKYListenerArgs {
     int serverFD;
     int* dskyFD;
     InportProxyT<IOPacket>* ioHostToAGC;
+    InportProxyT<Addr>* start;
 };
 
 void* runDSKYListener(void* arg) {
+    bool started = false;
+
     struct sockaddr_in client;
     socklen_t clientLen = sizeof(client);
     DSKYPacket inBuf;
@@ -153,8 +156,15 @@ void* runDSKYListener(void* arg) {
 
     listen(args->serverFD, 1);
     while (true) {
+        // accept blocks until we have a connection, so we can just wait to start the processor
         int dskyFD = accept(args->serverFD, (struct sockaddr*)&client, &clientLen);
         *(args->dskyFD) = dskyFD;
+
+        if (!started) {
+            printf("Got connection, starting processor!\n");
+            started = true;
+            args->start->sendMessage(AGC_START_IP);
+        }
 
         while (true) {
             if (read(dskyFD, &inBuf, sizeof(DSKYPacket)) < sizeof(DSKYPacket)) {
@@ -190,7 +200,7 @@ void* runAGCListener(void* arg) {
     }
 }
 
-void exitCleanly(ShutdownXactor* shutdown, SceMiServiceThread* scemiServiceThread, SceMi* sceMi, int serverFD, int ret) {
+void exitCleanly(ShutdownXactor* shutdown, SceMiServiceThread* scemiServiceThread, SceMi* sceMi, int serverFD, int dskyFD, int ret) {
     printf("Shutting down!\n");
 
     shutdown->blocking_send_finish();
@@ -200,9 +210,15 @@ void exitCleanly(ShutdownXactor* shutdown, SceMiServiceThread* scemiServiceThrea
 
     // Ie, not null or error opening
     if (serverFD > 0) {
-        printf("Trying to close\n");
+        printf("Trying to close serverFD\n");
         close(serverFD);
-        printf("Closed!\n");
+        printf("Closed serverFD!\n");
+    }
+
+    if (dskyFD > 0) {
+        printf("Tryign to close dskyFD\n");
+        close(dskyFD);
+        printf("Closed dskyFD!\n");
     }
 
     exit(ret);
@@ -248,14 +264,14 @@ int main(int argc, char* argv[]) {
 
     // Initialize the FPGA memory
     if (initMem((argc == 2) ? argv[1] : NULL, &memInit) != 0) {
-        exitCleanly(&shutdown, scemiServiceThread, sceMi, 0, 1);
+        exitCleanly(&shutdown, scemiServiceThread, sceMi, 0, 0, 1);
     }
 
     // Set up the DSKY socket
     int serverFD = socket(AF_INET, SOCK_STREAM, 0);
     if (serverFD < 0) {
         fprintf(stderr, "Error opening socket!\n");
-        exitCleanly(&shutdown, scemiServiceThread, sceMi, serverFD, 1);
+        exitCleanly(&shutdown, scemiServiceThread, sceMi, serverFD, 0, 1);
     }
 
     struct sockaddr_in server;
@@ -264,38 +280,30 @@ int main(int argc, char* argv[]) {
     server.sin_port = htons(DSKY_PORT);
     if (bind(serverFD, (struct sockaddr *) &server, sizeof(server)) < 0) {
         fprintf(stderr, "Error binding socket!\n");
-        exitCleanly(&shutdown, scemiServiceThread, sceMi, serverFD, 1);
+        exitCleanly(&shutdown, scemiServiceThread, sceMi, serverFD, 0, 1);
     }
 
     // Start the listeners in separate threads
     int dskyFD = 0;
     pthread_t dskyListener, agcListener;
-    RunDSKYListenerArgs dskyArgs = {serverFD, &dskyFD, &ioHostToAGC};
+    RunDSKYListenerArgs dskyArgs = {serverFD, &dskyFD, &ioHostToAGC, &start};
     RunAGCListenerArgs agcArgs = {&dskyFD, &ioAGCToHost};
 
     int failure = pthread_create(&dskyListener, NULL, runDSKYListener, &dskyArgs);
     if (failure) {
         fprintf(stderr, "Error creating DSKY listener thread: %d\n", failure);
-        exitCleanly(&shutdown, scemiServiceThread, sceMi, serverFD, 1);
+        exitCleanly(&shutdown, scemiServiceThread, sceMi, serverFD, dskyFD, 1);
     }
 
     failure = pthread_create(&agcListener, NULL, runAGCListener, &agcArgs);
     if (failure) {
         fprintf(stderr, "Error creating AGC listener thread: %d\n", failure);
-        exitCleanly(&shutdown, scemiServiceThread, sceMi, serverFD, 1);
+        exitCleanly(&shutdown, scemiServiceThread, sceMi, serverFD, dskyFD, 1);
     }
 
-    // Until we can find a better solution for this, wait to start the processor
-    // so we can connect yaDSKY2
-    printf("Press Enter to start\n");
-    getchar();
-
-    // Finally, start the processor
-    start.sendMessage(AGC_START_IP);
-
-    printf("Press Enter to quit\n");
+    printf("Waiting for yaDSKY connection...\n");
 
     getchar();
 
-    exitCleanly(&shutdown, scemiServiceThread, sceMi, serverFD, 0);
+    exitCleanly(&shutdown, scemiServiceThread, sceMi, serverFD, dskyFD, 0);
 }
