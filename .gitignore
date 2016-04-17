@@ -1,6 +1,7 @@
 build/
 out
 out.so
+simOut
 *.html
 *.lst
 
