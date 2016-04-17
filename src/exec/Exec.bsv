@@ -225,26 +225,18 @@ function Exec2Writeback ccs(ExecFuncArgs args);
 
     Word memRespCleaned = is16Bits ? memResp : {memResp[15], memResp[15:1]};
 
-    // This makes two copies of the dABS logic - can we do better?
     Word dabs = dABS(memRespCleaned);
 
-    // I think this is the correct interpretation of how to handle overflow here: just
-    // ignore the fact that it exists, and treat A, L, and Q as 16 bits.  We basically treat
-    // A, L, and Q as 15 bit registers, and then correct for the 1 cases where this is wrong
     // This could probably be made more efficient - we're choosing to do dynamic addition, but
     // might be worth the extra space and do static addition?  Unclear.  On the other hand, the
     // compiler can hopefully figure out that there are only 4 options for addend.
     Addr addend;
 
     // Note that positive numbers in 1's and 2's complement are the same
-    // Be wary of changing the order of this logic - this is written in such a way that
-    // the 16 bit value 1111111111111110 falls through to < -0, which saves us an A/L/Q fix,
-    // even though it "should" be == -0
-    // == +0
-    if (memRespCleaned[15:1] == 0) begin
+    if (memRespCleaned == 0) begin
         addend = 2;
     // == -0
-    end else if (memRespCleaned[15:1] == {1'b1, 0}) begin
+    end else if (memRespCleaned == ~0) begin
         addend = 4;
     // > +0
     end else if (memRespCleaned[15] == 0) begin
@@ -252,11 +244,6 @@ function Exec2Writeback ccs(ExecFuncArgs args);
     // < -0
     end else begin
         addend = 3;
-    end
-
-    // Fix A, L, and Q
-    if (is16Bits && (memResp == 1)) begin
-        addend = 1;
     end
 
     return Exec2Writeback {
@@ -513,14 +500,13 @@ function Exec2Writeback ts(ExecFuncArgs args);
 
     Bit#(15) top = signExtend(aResp[15]);
 
-    // TODO: Handle OVSK properly
     // TAGEXCEPTION
     return Exec2Writeback {
         eRes1: is16BitRegM(memAddr) ? aResp : {aResp[14:0], 1'b0},
         // Bluespec doesn't seem to like {15'b(aResp[15]), 1'b(!aResp[15])}.
-        eRes2: hasOverflow ? {top, ~aResp[15]} : aResp,
+        eRes2: {top, ~aResp[15]},
         memAddrOrIOChannel: tagged Addr memAddr,
-        regNum: tagged Valid rA,
+        regNum: (hasOverflow && (args.inst[10:1] != zeroExtend(rA))) ? tagged Valid rA : tagged Invalid,
         newZ: hasOverflow ? (args.z + 2) : (args.z + 1)
     };
 endfunction

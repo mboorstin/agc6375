@@ -211,10 +211,12 @@ module mkAGC(AGC);
         interface HostIO hostIO;
             method ActionValue#(IOPacket) agcToHost if (memory.init.done);
                 IOPacket ret <- io.hostIO.agcToHost();
+                $display("IO AGC to Host: ", ret);
                 return ret;
             endmethod
 
             method Action hostToAGC(IOPacket packet) if ((stage != Init) && memory.init.done);
+                $display("IO Host to AGC: ", packet);
                 io.hostIO.hostToAGC(packet);
             endmethod
         endinterface

@@ -2,5 +2,6 @@ build/
 out
 out.so
 *.html
+*.lst
 
 !.gitignore
