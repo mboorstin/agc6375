@@ -49,7 +49,7 @@ module mkAGC(AGC);
         // Get the actual address out of Z.  Z always holds the next address.
         // TAGLSB
         Addr zAddr = z[12:1];
-        Addr zAddrToFetch = subOnes(zAddr, 1);
+        Addr zAddrToFetch = subOnesCorrected(zAddr, 1);
 
         $display("Instruction address: o%o", zAddrToFetch);
 

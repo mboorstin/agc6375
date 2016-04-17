@@ -62,14 +62,15 @@ function Exec2Writeback ad(ExecFuncArgs args);
 
     Word mem_resp = fromMaybe(?, args.memOrIOResp);
     Word reg_resp = fromMaybe(?, args.regResp);
-    Addr memAddr = args.inst[12:1];
+    Addr memAddr = args.inst[12:1]; //TAGLSB
 
 
     //mem_resp is the value to be added to the accumulator.
     //TAGLSB
-    Word mem_val = {mem_resp[15], truncateLSB(mem_resp)};
+    //Word mem_val = {mem_resp[15], truncateLSB(mem_resp)};
+    Word mem_val = is16BitRegM(memAddr) ? mem_resp : {mem_resp[15], mem_resp[15:1]};
 
-    Word sum = addOnes(mem_val, reg_resp); //assume values are extended left
+    Word sum = addOnesUncorrected(mem_val, reg_resp); //assume values are extended left
 
     if (sum[15] != sum[14]) begin
         //overflow-- TAGEXCEPTION
@@ -93,12 +94,15 @@ function Exec2Writeback ads(ExecFuncArgs args);
 
     Word mem_resp = fromMaybe(?, args.memOrIOResp);
     Word reg_resp = fromMaybe(?, args.regResp);
+    Addr memAddr = zeroExtend(args.inst[10:1]); // TAGLSB
 
     //mem_resp is the value to be added to the accumulator.
     //TAGLSB
-    Word mem_val = {mem_resp[15], truncateLSB(mem_resp)};
+    //Word mem_val = {mem_resp[15], truncateLSB(mem_resp)};
+    Word mem_val = is16BitRegM(memAddr) ? mem_resp : {mem_resp[15], mem_resp[15:1]};
 
-    Word sum = addOnes(mem_val, reg_resp); //assume values are extended left
+    Word sum = addOnesUncorrected(mem_val, reg_resp); //assume values are extended left
+    SP sum_c = overflowCorrect(sum);
 
     if (sum[15] != sum[14]) begin
         //overflow-- TAGEXCEPTION
@@ -107,7 +111,7 @@ function Exec2Writeback ads(ExecFuncArgs args);
     //return
     Addr mem_addr_wb = {2'b0, args.inst[10:1]}; //10 bit k, from instruction
     Exec2Writeback e2w = Exec2Writeback{
-        eRes1:sum,
+        eRes1:{sum_c,1'b0}, //TAGLSB
         eRes2:sum, //write sum back to both
         memAddrOrIOChannel: tagged Addr mem_addr_wb,
         regNum: tagged Valid rA, //accumulator
@@ -126,9 +130,9 @@ function Bit#(n) addOrSub(Bit#(n) val)
                  Add#(c__, a__, TAdd#(n,2))
                 );
     if (val[valueOf(TSub#(n, 1))] == 0) begin
-        return addOnes(val, 1);
+        return addOnesUncorrected(val, 1);
     end else begin
-        return subOnes(val, 1);
+        return subOnesUncorrected(val, 1);
     end
 endfunction
 
@@ -296,9 +300,9 @@ function Bit#(n) subOrAddNonZero(Bit#(n) val)
     if ((val == 0) || (val == ~0)) begin
         return val;
     end else if (val[valueOf(TSub#(n, 1))] == 0) begin
-        return subOnes(val, 1);
+        return subOnesUncorrected(val, 1);
     end else begin
-        return addOnes(val, 1);
+        return addOnesUncorrected(val, 1);
     end
 endfunction
 
@@ -336,10 +340,10 @@ function Exec2Writeback incr(ExecFuncArgs args);
     Addr memAddr = {2'b0, args.inst[10:1]};
 
     if (is16BitRegM(memAddr)) begin
-        auged = addOnes(memResp, 1);
+        auged = addOnesCorrected(memResp, 1);
     end else begin
         // TAGLSB
-        auged = {addOnes(memResp[15:1], 1), 1'b0};
+        auged = {addOnesCorrected(memResp[15:1], 1), 1'b0};
     end
 
     return Exec2Writeback {
@@ -458,7 +462,7 @@ function Exec2Writeback su(ExecFuncArgs args);
     Word aResp = fromMaybe(?, args.regResp);
     Addr memAddr = zeroExtend(args.inst[10:1]);
 
-    Word aSubbed = subOnes(aResp, is16BitRegM(memAddr) ? memResp : signExtend(memResp[15:1]));
+    Word aSubbed = subOnesUncorrected(aResp, is16BitRegM(memAddr) ? memResp : signExtend(memResp[15:1]));
 
     return Exec2Writeback {
         eRes1: memResp,

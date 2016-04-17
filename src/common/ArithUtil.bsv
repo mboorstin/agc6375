@@ -24,7 +24,7 @@ endinterface
 //automatically overflow-corrected.
 //assumes a leading sign bit.
 //As in the original AGC, (-1) + (+1) = (-0)
-function Bit#(n) addOnes (Bit#(n) a, Bit#(n) b)
+function Bit#(TAdd#(n,1)) addOnesOverflow (Bit#(n) a, Bit#(n) b)
         provisos(Add#(a__, b__, TAdd#(n,1)),
                  Add#(1, a__, n),
                  Add#(c__, a__, TAdd#(n,2)));
@@ -50,16 +50,42 @@ function Bit#(n) addOnes (Bit#(n) a, Bit#(n) b)
 
     //return truncated sum.
     //Bit#(2) topbits = truncateLSB(sum_long);
-    msb = truncateLSB(sum_u);
+    //msb = truncateLSB(sum_u);
     //Bit#(1) msb2 = topbits[0];
-    Bit#(TSub#(n,1)) trun = truncate(sum_u);
+    //Bit#(TSub#(n,1)) trun = truncate(sum_u);
 
     //msb == 1 is an indicator of overflow.  Overflow can only occur when inputs are the same sign.
-    Bit#(n) sum = {msb[0], truncate(sum_u)};
+    //Bit#(n) sum = {msb[0], truncate(sum_u)};
     //(msb == 0) ? {truncate(sum_u)} : {sign_a, trun};
     
 
-    return sum;
+    return truncate(sum_u);
+
+endfunction
+
+function Bit#(n) addOnesCorrected (Bit#(n) a, Bit#(n) b)
+        provisos(Add#(a__, b__, TAdd#(n,1)),
+                 Add#(1, a__, n),
+                 Add#(c__, a__, TAdd#(n,2)));
+    //
+    //get full sum
+    Bit#(TAdd#(n,1)) sum_u = addOnesOverflow(a,b);
+
+    Bit#(1) msb = truncateLSB(sum_u);
+    Bit#(n) corrected_sum = {msb, truncate(sum_u)};
+
+    return corrected_sum;
+endfunction
+
+function Bit#(n) addOnesUncorrected (Bit#(n) a, Bit#(n) b)
+        provisos(Add#(a__, b__, TAdd#(n,1)),
+                 Add#(1, a__, n),
+                 Add#(c__, a__, TAdd#(n,2)));
+    //
+    //get full sum
+    Bit#(TAdd#(n,1)) sum_u = addOnesOverflow(a,b);
+
+    return truncate(sum_u);
 
 endfunction
 
@@ -93,7 +119,7 @@ function Bit#(TAdd#(n,1)) addOnesCarry (Bit#(n) a, Bit#(n) b);
 endfunction
 
 //returns the sum of a and b with a signed carry bit
-function Bit#(TAdd#(n,1)) addOnesOverflow (Bit#(n) a, Bit#(n) b)
+/*function Bit#(TAdd#(n,1)) addOnesOverflow (Bit#(n) a, Bit#(n) b)
         provisos(Add#(1, a__, n));
     //
     Bit#(1) sign_a = truncateLSB(a);
@@ -102,16 +128,24 @@ function Bit#(TAdd#(n,1)) addOnesOverflow (Bit#(n) a, Bit#(n) b)
 
     return sum_u;
 
-endfunction
+endfunction*/
 
 //subtraction.
 //a - b is returned.
-function Bit#(n) subOnes (Bit#(n) a, Bit#(n) b)
+function Bit#(n) subOnesCorrected (Bit#(n) a, Bit#(n) b)
         provisos(Add#(a__, b__, TAdd#(n,1)),
                  Add#(1, a__, n),
                  Add#(c__, a__, TAdd#(n,2)));
     //invert b, add.
-    return addOnes(a, ~b);
+    return addOnesCorrected(a, ~b);
+endfunction
+
+function Bit#(n) subOnesUncorrected (Bit#(n) a, Bit#(n) b)
+        provisos(Add#(a__, b__, TAdd#(n,1)),
+                 Add#(1, a__, n),
+                 Add#(c__, a__, TAdd#(n,2)));
+    //invert b, add.
+    return addOnesUncorrected(a, ~b);
 endfunction
 
 //multiplication
@@ -210,19 +244,27 @@ function Bit#(n) toOnes(Bit#(n) a)
     return ones;
 endfunction
 
-//functions for converting SP/DP values and performing arithmetic with them
-function SP addSP (SP a, SP b);
-    return addOnes(a, b);
-endfunction
-
-
-function DP addDP(DP a, DP b);
+//adding DP values
+function DP addDPCorrected(DP a, DP b);
     //holders
     DP a_con = makeConsistentSign(a);
     DP b_con = makeConsistentSign(b);
 
     //preliminary addition
-    Bit#(29) result = addOnes({a_con[29:15],a_con[13:0]},{b_con[29:15],b_con[13:0]});
+    Bit#(29) result = addOnesCorrected({a_con[29:15],a_con[13:0]},{b_con[29:15],b_con[13:0]});
+
+    DP out = {result[28:14], result[28], result[13:0]};
+
+    return out;
+endfunction
+
+function DP addDPUncorrected(DP a, DP b);
+    //holders
+    DP a_con = makeConsistentSign(a);
+    DP b_con = makeConsistentSign(b);
+
+    //preliminary addition
+    Bit#(29) result = addOnesUncorrected({a_con[29:15],a_con[13:0]},{b_con[29:15],b_con[13:0]});
 
     DP out = {result[28:14], result[28], result[13:0]};
 
@@ -251,8 +293,8 @@ function DP makeConsistentSign(DP a);
         end
         else begin //ordinary use
             if (a[29] == 1) begin //if larger portion is negative
-                new_high = addOnes(high, fromInteger(1)); //move amount from smaller SP to larger SP
-                new_low = subOnes(low, 15'b100_000_000_000_000);
+                new_high = addOnesUncorrected(high, fromInteger(1)); //move amount from smaller SP to larger SP
+                new_low = subOnesUncorrected(low, 15'b100_000_000_000_000);
             end
             else begin //otherwise
 
@@ -260,10 +302,10 @@ function DP makeConsistentSign(DP a);
                     new_high = 15'b0; //move amount from larger SP to smaller SP
                 end
                 else begin
-                    new_high = subOnes(high, 15'b1);
+                    new_high = subOnesUncorrected(high, 15'b1);
                 end
 
-                new_low = addOnes(low, 15'b100_000_000_000_000);
+                new_low = addOnesUncorrected(low, 15'b100_000_000_000_000);
             end
             
         end

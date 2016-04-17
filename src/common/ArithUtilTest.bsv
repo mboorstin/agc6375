@@ -53,8 +53,8 @@ module mkArithUtilTest ();
     dpin1[5] = 30'o77776_00001;
     dpin1[6] = 30'o00000_00001;
     dpin1[7] = 30'o40300_45600;
-    dpin1[8] = 30'o00000_00000;
-    dpin1[9] = 30'o77777_00000;
+    dpin1[8] = 30'o37777_40000;
+    dpin1[9] = 30'o37776_00001;
     Vector#(10, Fmt) fmt1 = newVector;
     for (Integer i = 0; i < 10; i = i + 1) begin
         fmt1[i] = $format("(") + displayDecimal(dpin1[i][29:15]) + $format(",    ") + displayDecimal(dpin1[i][14:0]) + $format(")");
@@ -111,12 +111,12 @@ module mkArithUtilTest ();
 */
 
             //overflow addition test
-            //SP result = addOnes(spin1[i], spin2[i]);
+            //SP result = addOnesUncorrected(spin1[i], spin2[i]);
             //$display(displayDecimal(spin1[i]), $format("    +    "), displayDecimal(spin2[i]), $format("    =    "), displayDecimal(result));
             
             //dABS test
-            SP result = dABS(spin1[i]);
-            $display(displayDecimal(spin1[i]), $format(" => "), displayDecimal(result));
+            //SP result = dABS(spin1[i]);
+            //$display(displayDecimal(spin1[i]), $format(" => "), displayDecimal(result));
 
             //slow division test
             /*DP quot1 = divideSlow(dpin1[i], spin1[i]);
@@ -130,9 +130,9 @@ module mkArithUtilTest ();
             $display("");*/
 
             //consistent sign test
-            /*DP result = makeConsistentSign(dpin1[i]);
+            DP result = makeConsistentSign(dpin1[i]);
             Fmt fmt_result = $format("(") + displayDecimal(result[29:15]) + $format(",    ") + displayDecimal(result[14:0]) + $format(")");
-            $display(fmt1[i], $format(" => "), fmt_result);*/
+            $display(fmt1[i], $format(" => "), fmt_result);
 
 
 
