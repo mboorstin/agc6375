@@ -120,7 +120,11 @@ endfunction
 // Increments a positive value in an erasable-memory location in-place by +1
 // or a negative value by -1
 // Parameterized helper function
-function Bit#(n) addOrSub(Bit#(n) val);
+function Bit#(n) addOrSub(Bit#(n) val)
+        provisos(Add#(1, a__, n),
+                Add#(a__, b__, TAdd#(n, 1)),
+                 Add#(c__, a__, TAdd#(n,2))
+                );
     if (val[valueOf(TSub#(n, 1))] == 0) begin
         return addOnes(val, 1);
     end else begin
@@ -284,7 +288,11 @@ endfunction
 // handling of +/- 0.  Code-wise, Bluespec doesn't allow function pointers, so it's
 // not really worth the overhead of combining aug and dim.
 // Parameterized helper function
-function Bit#(n) subOrAddNonZero(Bit#(n) val);
+function Bit#(n) subOrAddNonZero(Bit#(n) val)
+        provisos(Add#(1, a__, n),
+            Add#(a__, b__, TAdd#(n, 1)),
+            Add#(c__, a__, TAdd#(n,2))
+            );
     if ((val == 0) || (val == ~0)) begin
         return val;
     end else if (val[valueOf(TSub#(n, 1))] == 0) begin

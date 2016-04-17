@@ -21,37 +21,67 @@ endinterface
 //functions for ones complement arithmetic
 
 //addition.
-//overflow could be an issue.
+//automatically overflow-corrected.
+//assumes a leading sign bit.
 //As in the original AGC, (-1) + (+1) = (-0)
-function Bit#(n) addOnes (Bit#(n) a, Bit#(n) b);
+function Bit#(n) addOnes (Bit#(n) a, Bit#(n) b)
+        provisos(Add#(a__, b__, TAdd#(n,1)),
+                 Add#(1, a__, n),
+                 Add#(c__, a__, TAdd#(n,2)));
     //
-    Bit#(TAdd#(n,1)) sum_u = addOnesCarry(a, b);
 
-    Bit#(n) sum;
-    Bit#(1) msb = truncateLSB(sum_u);
+    //unsigned a and b magnitudes
+    Bit#(1) sign_a = truncateLSB(a);
+    Bit#(1) sign_b = truncateLSB(b);
+    //Bit#(n) u_a = (sign_a == 0) ? a : ~a;
+    //Bit#(n) u_b = (sign_b == 0) ? b : ~b;
+    Bit#(TAdd#(n,1)) a_long = {sign_a, a};
+    Bit#(TAdd#(n,1)) b_long = {sign_b, b};
 
-    if (msb == 1) begin //if the carry bit overflows to the left
+
+    Bit#(TAdd#(n,2)) sum_u = addOnesCarry(a_long, b_long);
+    
+    Bit#(2) msb = truncateLSB(sum_u);
+
+    if (msb[1] == 1) begin //if the carry bit overflows to the left
         //wrap it back around to the right.
-        sum_u = truncate(addOnesCarry(sum_u, fromInteger(1)));
+        sum_u = addOnesCarry(truncate(sum_u), fromInteger(1));
     end
 
     //return truncated sum.
-    sum = truncate(sum_u);
+    //Bit#(2) topbits = truncateLSB(sum_long);
+    msb = truncateLSB(sum_u);
+    //Bit#(1) msb2 = topbits[0];
+    Bit#(TSub#(n,1)) trun = truncate(sum_u);
+
+    //msb == 1 is an indicator of overflow.  Overflow can only occur when inputs are the same sign.
+    Bit#(n) sum = {msb[0], truncate(sum_u)};
+    //(msb == 0) ? {truncate(sum_u)} : {sign_a, trun};
+    
 
     return sum;
 
 endfunction
 
+//overflow correction of a value like that in the accumulator
+//bit 15 is only used for overflow correction / checking
+//usual use case is transferring an accumulator value outside
+//running it on a value which has not overflowed should return the same value.
+function SP overflowCorrect(Bit#(16) a);
+    SP result = {a[15],a[13:0]}; //extract magnitude bits and corrected sign bit from a
+    return result;
+endfunction
+
 //addition
 //automatically overflow-corrected
-function SP addOnesOverflow (SP a, SP b);
+/*function SP addOnesOverflow (SP a, SP b);
     //
     Bit#(16) a_ext = {a[14], a[14:0]};
     Bit#(16) b_ext = {b[14], b[14:0]};
     Bit#(16) uncorrected = addOnes(a_ext, b_ext);
     SP corrected = overflowCorrect(uncorrected);
     return corrected;
-endfunction
+endfunction*/
 
 //returns the sum of a and b with a carry bit as the MSB
 function Bit#(TAdd#(n,1)) addOnesCarry (Bit#(n) a, Bit#(n) b);
@@ -62,9 +92,24 @@ function Bit#(TAdd#(n,1)) addOnesCarry (Bit#(n) a, Bit#(n) b);
 
 endfunction
 
+//returns the sum of a and b with a signed carry bit
+function Bit#(TAdd#(n,1)) addOnesOverflow (Bit#(n) a, Bit#(n) b)
+        provisos(Add#(1, a__, n));
+    //
+    Bit#(1) sign_a = truncateLSB(a);
+    Bit#(1) sign_b = truncateLSB(b);
+    Bit#(TAdd#(n,1)) sum_u = {sign_a, a} + {sign_b, b};
+
+    return sum_u;
+
+endfunction
+
 //subtraction.
 //a - b is returned.
-function Bit#(n) subOnes (Bit#(n) a, Bit#(n) b);
+function Bit#(n) subOnes (Bit#(n) a, Bit#(n) b)
+        provisos(Add#(a__, b__, TAdd#(n,1)),
+                 Add#(1, a__, n),
+                 Add#(c__, a__, TAdd#(n,2)));
     //invert b, add.
     return addOnes(a, ~b);
 endfunction
@@ -231,14 +276,7 @@ function DP makeConsistentSign(DP a);
     return out;
 endfunction
 
-//overflow correction of a value like that in the accumulator
-//bit 15 is only used for overflow correction / checking
-//usual use case is transferring an accumulator value outside
-//running it on a value which has not overflowed should return the same value.
-function SP overflowCorrect(Bit#(16) a);
-    SP result = {a[15],a[13:0]}; //extract magnitude bits and corrected sign bit from a
-    return result;
-endfunction
+
 
 
 function DP divideSlow (DP a, SP b);
@@ -419,9 +457,17 @@ function Fmt displayDecimal(Bit#(n) a)
 endfunction
 
 //  DABS(x)=|x|-1 if |x|>1, or +0 otherwise.
-function Bit#(n) dABS(Bit#(n) x);
-    // If is negative, make positive
-    Bit#(TSub#(n, 1)) abs = (x[valueOf(TSub#(n, 1))] == 1) ? ~truncate(x) : truncate(x);
+function Bit#(n) dABS(Bit#(n) x)
+        provisos(Add#(1, a__, n));
+    
+    //extract sign bit and magnitude
+    Bit#(1) sign_x = truncateLSB(x);
+    Bit#(n) x_mag = (sign_x == 0) ? x : ~x;
+
+    //do operation if necessary
+    Bit#(n) out_mag = (x_mag >= 1) ? (x_mag - 1) : x_mag;
+    //Bit#(TSub#(n, 1)) abs = (x[valueOf(TSub#(n, 1))] == 1) ? ~truncate(x) : truncate(x);
     // Subtract one if appropriate
-    return zeroExtend(((abs == 0) || (abs == 1)) ? 0 : subOnes(abs, 1));
+    //return zeroExtend(((abs == 0) || (abs == 1)) ? 0 : subOnes(abs, 1));
+    return out_mag;
 endfunction

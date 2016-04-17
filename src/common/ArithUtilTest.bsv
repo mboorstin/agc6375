@@ -8,7 +8,8 @@ module mkArithUtilTest ();
     //state
     Reg#(Bool) started <- mkReg(False);
     Reg#(Bool) done <- mkReg(False);
-    Reg#(Bool) testing_module <- mkReg(True); //is this testbench currently testing a module?
+    Reg#(Bool) testing_module <- mkReg(False); //is this testbench currently testing a module?
+                                                //use this to control rule behavior.
     Reg#(Bool) requesting <- mkReg(True);
     Reg#(DP) curr_dpin1 <- mkReg(30'b0);
     Reg#(DP) curr_dpin2 <- mkReg(30'b0);
@@ -20,8 +21,8 @@ module mkArithUtilTest ();
 
     //test inputs
     Vector#(10, SP) spin1 = newVector;
-    spin1[0] = 15'o00000;
-    spin1[1] = 15'o00001;
+    spin1[0] = 15'o37776;
+    spin1[1] = 15'o77776;
     spin1[2] = 15'o00001;
     spin1[3] = 15'o00010;
     spin1[4] = 15'o37777;
@@ -32,8 +33,8 @@ module mkArithUtilTest ();
     spin1[9] = 15'o70000;
 
     Vector#(10, SP) spin2 = newVector;
-    spin2[0] = 15'o00000;
-    spin2[1] = 15'o00001;
+    spin2[0] = 15'o00002;
+    spin2[1] = 15'o77776;
     spin2[2] = 15'o77776;
     spin2[3] = 15'o77767;
     spin2[4] = 15'o00001;
@@ -84,6 +85,7 @@ module mkArithUtilTest ();
     rule one_in (started && !done && !testing_module);
         //send in data
         for (Integer i = 0; i < 10; i = i + 1) begin
+            //overflow correction test
             //Bit#(1) lead1 = truncateLSB(spin1[i]);
             //Bit#(1) lead2 = truncateLSB(spin2[i]);
             //Bit#(16) result0 = addOnes({lead1, spin1[i]}, {lead2,spin2[i]});
@@ -109,8 +111,13 @@ module mkArithUtilTest ();
 */
 
             //overflow addition test
-            //SP result = addOnesOverflow(spin1[i], spin2[i]);
+            //SP result = addOnes(spin1[i], spin2[i]);
+            //$display(displayDecimal(spin1[i]), $format("    +    "), displayDecimal(spin2[i]), $format("    =    "), displayDecimal(result));
             
+            //dABS test
+            SP result = dABS(spin1[i]);
+            $display(displayDecimal(spin1[i]), $format(" => "), displayDecimal(result));
+
             //slow division test
             /*DP quot1 = divideSlow(dpin1[i], spin1[i]);
             $display(displayDecimal({dpin1[i][29:15], dpin1[i][13:0]}), "    /    ", displayDecimal(spin1[i]));
