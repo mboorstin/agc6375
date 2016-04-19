@@ -35,7 +35,12 @@ module mkAGC(AGC);
 
     function Instruction handleIndex(Instruction inst);
         if (isValid(indexAddend)) begin
-            return inst + fromMaybe(?, indexAddend);
+            // We basically need to treat inst as unsigned and indexAddend as signed.
+            // This presumes INDEX ignores overflow - it's not actually specified as such but seems the most reasonable option.
+            Bit#(15) topBitZerod = addOnesUncorrected({1'b0, inst[14:1]}, fromMaybe(?, indexAddend)[15:1]);
+            Bit#(1) topBit = inst[15] ^ topBitZerod[14];
+            return {topBit, topBitZerod[13:0], 1'b0};
+
         end else begin
             return inst;
         end
@@ -75,9 +80,12 @@ module mkAGC(AGC);
 
         // Add the index to it if necessary
         if (isValid(indexAddend)) begin
-            $display("IndexAddend is valid!");
+            $display("indexAddend is valid: instruction = 0x%x, indexAddend = 0x%x", inst[15:1], fromMaybe(?, indexAddend));
         end
         inst = handleIndex(inst);
+        if (isValid(indexAddend)) begin
+            $display("New instruction: 0x%x", inst);
+        end
 
         // Do the decode
         DecodeRes decoded = decode(inst, isExtended);

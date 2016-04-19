@@ -364,8 +364,7 @@ function Exec2Writeback index(ExecFuncArgs args);
     // but we only use it for is16BItRegM and isCSCE.
     Addr memAddr = zeroExtend(args.inst[10:1]);
 
-    // TAGEXCEPTION
-    Word toAdd = is16BitRegM(memAddr) ? {memResp[14:0], 0} : memResp;
+    Word toAdd = is16BitRegM(memAddr) ? {overflowCorrect(memResp), 0} : memResp;
 
     return Exec2Writeback {
         eRes1: memResp,
@@ -512,9 +511,8 @@ function Exec2Writeback ts(ExecFuncArgs args);
 
     Bit#(15) top = signExtend(aResp[15]);
 
-    // TAGEXCEPTION
     return Exec2Writeback {
-        eRes1: is16BitRegM(memAddr) ? aResp : {aResp[14:0], 1'b0},
+        eRes1: is16BitRegM(memAddr) ? aResp : {overflowCorrect(aResp), 1'b0},
         // Bluespec doesn't seem to like {15'b(aResp[15]), 1'b(!aResp[15])}.
         eRes2: {top, ~aResp[15]},
         memAddrOrIOChannel: tagged Addr memAddr,
