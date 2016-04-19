@@ -25,22 +25,22 @@ typedef enum {
 typedef struct {
     Addr z;
     Instruction inst;
-    InstNum instNum;
-    MemOrIODeq deqFromMemOrIO;
-    Bool deqFromReg;
+    DecodeRes decoded;
+    Word fromMemForDouble;
+    Word fromRegForDouble;
 } Decode2Exec deriving (Eq, Bits, FShow);
 
 typedef struct {
     Addr z;
     Instruction inst;
     InstNum instNum;
-    Maybe#(Word) memOrIOResp; //corresponds to deqFromMemOrIO
-    Maybe#(Word) regResp; //corresponds to deqFromReg
+    DoubleWord memOrIOResp; //corresponds to deqFromMemOrIO
+    DoubleWord regResp; //corresponds to deqFromReg
 } ExecFuncArgs deriving (Eq, Bits, FShow);
 
 typedef struct {
-    Word eRes1; //corresponds to memAddrOrIOChannel
-    Word eRes2; //corresponds to regNum
+    DoubleWord eRes1; //corresponds to memAddrOrIOChannel
+    DoubleWord eRes2; //corresponds to regNum
     AddrOrIOChannel memAddrOrIOChannel;
     Maybe#(RegIdx) regNum;
     Addr newZ;

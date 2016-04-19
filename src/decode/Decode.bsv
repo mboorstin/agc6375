@@ -212,6 +212,14 @@ function DecodeRes dCS(Instruction inst);
     };
 endfunction
 
+function DecodeRes dDCA(Instruction inst);
+    return DecodeRes {
+        memAddrOrIOChannel: tagged Addr inst[12:1],
+        regNum: tagged Invalid,
+        instNum: DCA
+    };
+endfunction
+
 function DecodeRes dEDRUPT();
     return DecodeRes {
         memAddrOrIOChannel: tagged None,

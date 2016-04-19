@@ -7,6 +7,9 @@ typedef 16 WordSz;
 typedef Bit#(WordSz) Word;
 typedef Word Instruction;
 
+typedef 32 DoubleWordSz;
+typedef Bit#(DoubleWordSz) DoubleWord;
+
 typedef 7 IOChannelSize;
 typedef Bit#(IOChannelSize) IOChannel;
 
@@ -261,3 +264,7 @@ typedef enum {
     EXTEND,
     UNIMPLEMENTED
 } InstNum deriving (Eq, Bits, FShow);
+
+function Bool isDoubleInst(InstNum inst);
+    return (inst == DAS) || (inst == DXCH) || (inst == DCA) || (inst == DCS);
+endfunction

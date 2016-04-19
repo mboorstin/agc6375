@@ -12,7 +12,9 @@ typedef enum {
     Init,
     Fetch,
     Decode,
+    DecodeDouble,
     Exec,
+    WritebackDouble,
     Writeback,
     Finished
 } Stage deriving(Eq, Bits, FShow);
@@ -26,6 +28,7 @@ module mkAGC(AGC);
     // Stage management
     Reg#(Stage) stage <- mkReg(Init);
     Fifo#(2, Fetch2Decode) f2d <- mkPipelineFifo;
+    Fifo#(2, Decode2Exec) d2dd <- mkPipelineFifo;
     Fifo#(2, Decode2Exec) d2e <- mkPipelineFifo;
     Fifo#(2, Exec2Writeback) e2w <- mkPipelineFifo;
 
@@ -96,14 +99,11 @@ module mkAGC(AGC);
         end
 
         // Do the memory and IO requests
-        MemOrIODeq deqFromMemOrIO = None;
         if (decoded.memAddrOrIOChannel matches tagged Addr .addr) begin
            $display("Requesting data load: o%o", addr);
            memory.fetcher.memReq(addr);
-           deqFromMemOrIO = Mem;
         end else if (decoded.memAddrOrIOChannel matches tagged IOChannel .channel) begin
             io.internalIO.readReq(channel);
-            deqFromMemOrIO = IO;
         end
 
         if (isValid(decoded.regNum)) begin
@@ -117,23 +117,59 @@ module mkAGC(AGC);
             isExtended <= False;
         end
 
-        // Notify execute
-        d2e.enq(Decode2Exec{
+        Decode2Exec d2eArgs = Decode2Exec{
             z: last.z,
             inst: inst,
-            instNum: decoded.instNum,
-            deqFromMemOrIO: deqFromMemOrIO,
-            deqFromReg: isValid(decoded.regNum)
-        });
+            decoded: decoded,
+            fromMemForDouble: ?,
+            fromRegForDouble: ?
+        };
 
         // Set the new stage
-        if (decoded.instNum == EDRUPT) begin
-            $display("Got EDRUPT!");
-            stage <= Finished;
+        if (isDoubleInst(decoded.instNum)) begin
+            d2dd.enq(d2eArgs);
+            stage <= DecodeDouble;
         end else begin
-            stage <= Exec;
+            // Notify execute
+            d2e.enq(d2eArgs);
+
+            if (decoded.instNum == EDRUPT) begin
+                $display("Got EDRUPT!");
+                stage <= Finished;
+            end else begin
+                stage <= Exec;
+            end
         end
 
+    endrule
+
+    rule decodeDouble((stage == DecodeDouble) && memory.init.done);
+        $display("DecodeDouble--------------------------------------------------------------------------------------");
+
+        // Get the data from decode
+        Decode2Exec last = d2dd.first();
+        $display("d2dd.first: ", fshow(last));
+        d2dd.deq();
+
+        DecodeRes decoded = last.decoded;
+
+        // Get memory and register responses if necessary, and make the requests as appropriate
+        if (decoded.memAddrOrIOChannel matches tagged Addr .addr) begin
+            Word memResp <- memory.fetcher.memResp();
+            last.fromMemForDouble = memResp;
+
+            memory.fetcher.memReq(addr + 1);
+        end
+
+        if (decoded.regNum matches tagged Valid .regNum) begin
+            let regRespVal <- memory.fetcher.regResp();
+            last.fromRegForDouble = regRespVal;
+
+            memory.fetcher.regReq(regNum + 1);
+        end
+
+        d2e.enq(last);
+        stage <= Exec;
     endrule
 
     rule execute((stage == Exec) && memory.init.done);
@@ -143,34 +179,32 @@ module mkAGC(AGC);
         $display("d2e.first: ", fshow(last));
         d2e.deq();
 
+        DecodeRes decoded = last.decoded;
+
         // Get the memory responses if necessary.
         // Doing if's because of ActionValue sadness
-        Maybe#(Word) memOrIOResp;
-        if (last.deqFromMemOrIO == Mem) begin
+        Word memOrIORespLower = ?;
+        if (decoded.memAddrOrIOChannel matches tagged Addr .addr) begin
             Word memResp <- memory.fetcher.memResp();
-            memOrIOResp = tagged Valid memResp;
-        end else if (last.deqFromMemOrIO == IO) begin
+            memOrIORespLower = memResp;
+        end else if (decoded.memAddrOrIOChannel matches tagged IOChannel .channel) begin
             Word ioResp <- io.internalIO.readResp();
-            memOrIOResp = tagged Valid ioResp;
-        end else begin
-            memOrIOResp = tagged Invalid;
+            memOrIORespLower = ioResp;
         end
 
-        Maybe#(Word) regResp;
-        if (last.deqFromReg) begin
-            let regRespVal <- memory.fetcher.regResp();
-            regResp = tagged Valid regRespVal;
-        end else begin
-            regResp = tagged Invalid;
+        Word regRespLower = ?;
+        if (decoded.regNum matches tagged Valid .regNum) begin
+            Word regResp <- memory.fetcher.regResp();
+            regRespLower = regResp;
         end
 
         // Do the actual computations
         ExecFuncArgs execArgs = ExecFuncArgs{
             z: last.z,
             inst: last.inst,
-            instNum: last.instNum,
-            memOrIOResp: memOrIOResp,
-            regResp: regResp
+            instNum: decoded.instNum,
+            memOrIOResp: {last.fromMemForDouble, memOrIORespLower},
+            regResp: {last.fromRegForDouble, regRespLower}
         };
 
         //Bit#(15) one = 1;
@@ -181,12 +215,29 @@ module mkAGC(AGC);
         $display("execRes: ", fshow(execRes));
 
         // Set the index addend if necessary
-        indexAddend <= (last.instNum == INDEX) ? tagged Valid execRes.eRes2 : tagged Invalid;
+        indexAddend <= (decoded.instNum == INDEX) ? tagged Valid execRes.eRes2[15:0] : tagged Invalid;
 
         // Notifiy writeback
         e2w.enq(execRes);
 
         // Set the new stage
+        stage <= isDoubleInst(decoded.instNum) ? WritebackDouble : Writeback;
+    endrule
+
+    rule writebackDouble((stage == WritebackDouble) && memory.init.done);
+        $display("WritebackDouble-----------------------------------------------------------------------------------");
+
+        // Get the data from execute - note that we don't dequeue
+        Exec2Writeback last = e2w.first();
+
+        // Make the memory requests if necessary
+        if (last.memAddrOrIOChannel matches tagged Addr .addr) begin
+            memory.storer.memStore(addr + 1, last.eRes1[31:16]);
+        end
+        if (last.regNum matches tagged Valid .regNum) begin
+            memory.storer.regStore(regNum + 1, last.eRes2[31:16]);
+        end
+
         stage <= Writeback;
     endrule
 
@@ -202,12 +253,12 @@ module mkAGC(AGC);
 
         // Make the memory and I/O requests if necessary
         if (last.memAddrOrIOChannel matches tagged Addr .addr) begin
-            memory.storer.memStore(addr, last.eRes1);
+            memory.storer.memStore(addr, last.eRes1[15:0]);
         end else if (last.memAddrOrIOChannel matches tagged IOChannel .channel) begin
-            io.internalIO.write(channel, last.eRes1);
+            io.internalIO.write(channel, last.eRes1[15:0]);
         end
-        if (isValid(last.regNum)) begin
-            memory.storer.regStore(fromMaybe(?, last.regNum), last.eRes2);
+        if (last.regNum matches tagged Valid .regNum) begin
+            memory.storer.regStore(regNum, last.eRes2[15:0]);
         end
 
         // Set the new stage
