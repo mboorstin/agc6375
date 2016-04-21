@@ -66,10 +66,10 @@ function DecodeRes decode(Instruction inst, Bool isExtended);
                 endcase
             end
             opDCA: begin //DCA
-                return dUNIMPLEMENTED();
+                return dDCA(inst);
             end
             opDCS: begin //DCS
-                return dUNIMPLEMENTED();
+                return dDCS(inst);
             end
             opINDEX: begin //INDEX
                 return dINDEXExtended(inst);
@@ -119,7 +119,7 @@ function DecodeRes decode(Instruction inst, Bool isExtended);
             opDAS: begin //corresponds to DAS, LXCH, INCR, and ADS
                 case (qq)
                     qcDAS: begin //DAS
-                        return dUNIMPLEMENTED();
+                        return dUNIMPLEMENTED();//dDAS(inst);
                     end
                     qcLXCH: begin //LXCH
                         return dRegXCH(inst, rL, LXCH);
@@ -144,7 +144,7 @@ function DecodeRes decode(Instruction inst, Bool isExtended);
                         return dINDEXBasic(inst);
                     end
                     qcDXCH: begin //DXCH
-                        return dUNIMPLEMENTED();
+                        return dDXCH(inst);
                     end
                     qcTS: begin //TS
                         return dTS();
@@ -212,11 +212,35 @@ function DecodeRes dCS(Instruction inst);
     };
 endfunction
 
+function DecodeRes dDAS(Instruction inst);
+    return DecodeRes {
+        memAddrOrIOChannel: tagged Addr zeroExtend(inst[10:1] - 1),
+        regNum: tagged Valid rA,
+        instNum: DAS
+    };
+endfunction
+
 function DecodeRes dDCA(Instruction inst);
     return DecodeRes {
-        memAddrOrIOChannel: tagged Addr inst[12:1],
+        memAddrOrIOChannel: tagged Addr (inst[12:1] - 1),
         regNum: tagged Invalid,
         instNum: DCA
+    };
+endfunction
+
+function DecodeRes dDCS(Instruction inst);
+    return DecodeRes {
+        memAddrOrIOChannel: tagged Addr (inst[12:1] - 1),
+        regNum: tagged Invalid,
+        instNum: DCS
+    };
+endfunction
+
+function DecodeRes dDXCH(Instruction inst);
+    return DecodeRes {
+        memAddrOrIOChannel: tagged Addr zeroExtend(inst[10:1] - 1),
+        regNum: tagged Valid rA,
+        instNum: DXCH
     };
 endfunction
 

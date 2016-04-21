@@ -21,8 +21,12 @@ function Exec2Writeback exec(ExecFuncArgs args);
         CA: return ca(args);
         CCS: return ccs(args);
         CS: return cs(args);
+        DAS: return das(args);
+        DCA: return dca(args);
+        DCS: return dcs(args);
+        DXCH: return dxch(args);
         DIM: return dim(args);
-        // Bunch of double's here
+        // Bunch of stuff here
         INCR: return incr(args);
         INDEX: return index(args);
         // Bunch of other stuff here
@@ -306,6 +310,89 @@ function Bit#(n) subOrAddNonZero(Bit#(n) val)
     end
 endfunction
 
+// Double add to storage
+// The "Double Add to Storage" instruction does a double-precision (DP) add of
+// the A,L register pair to a pair of variables in erasable memory.
+function Exec2Writeback das(ExecFuncArgs args);
+    // TODO: FIX ME!
+
+    return Exec2Writeback {
+        eRes1: ?,
+        eRes2: ?,
+        memAddrOrIOChannel: tagged None,
+        regNum: tagged Invalid,
+        newZ: args.z + 1
+    };
+endfunction
+
+// Double clear-and-add
+// The "Double Clear and Add" instruction moves the contents of a pair of
+// memory locations into the A,L register pair.
+function Exec2Writeback dca(ExecFuncArgs args);
+    Word kResp = args.memOrIOResp[31:16];
+    Word kp1Resp = args.memOrIOResp[15:0];
+
+    Addr memAddr = args.inst[12:1] - 1;
+
+    Word aVal;
+    Word lVal;
+
+    // If is L, both A and L get Q
+    if (memAddr == zeroExtend(rL)) begin
+        aVal = kp1Resp;
+        lVal = kp1Resp;
+    end else begin
+        aVal = is16BitRegM(memAddr) ? kResp : signExtend(kResp[15:1]);
+        lVal = is16BitRegM(memAddr + 1) ? kp1Resp : signExtend(kp1Resp[15:1]);
+    end
+
+    lVal = signExtend(overflowCorrect(lVal));
+
+    return Exec2Writeback {
+        eRes1: args.memOrIOResp,
+        eRes2: {lVal, aVal},
+        // Writing back never hurts us (except for losing a cycle), so we can
+        // afford to write back both words
+        memAddrOrIOChannel: (memAddr == zeroExtend(rBRUPT) || isCSCE(memAddr)) ? tagged Addr memAddr : tagged None,
+        regNum: tagged Valid rA,
+        newZ: args.z + 1
+    };
+endfunction
+
+// Double Clear and Subtract
+// The "Double Clear and Subtract" instruction moves the 1's-complement (i.e., the
+// negative) of the contents of a pair of memory locations into the A,L register pair.
+function Exec2Writeback dcs(ExecFuncArgs args);
+    Word kResp = args.memOrIOResp[31:16];
+    Word kp1Resp = args.memOrIOResp[15:0];
+
+    Addr memAddr = args.inst[12:1] - 1;
+
+    Word aVal;
+    Word lVal;
+
+    // If is L, both A and L get Q
+    if (memAddr == zeroExtend(rL)) begin
+        aVal = ~kp1Resp;
+        lVal = ~kp1Resp;
+    end else begin
+        aVal = ~(is16BitRegM(memAddr) ? kResp : signExtend(kResp[15:1]));
+        lVal = ~(is16BitRegM(memAddr + 1) ? kp1Resp : signExtend(kp1Resp[15:1]));
+    end
+
+    lVal = signExtend(overflowCorrect(lVal));
+
+    return Exec2Writeback {
+        eRes1: args.memOrIOResp,
+        eRes2: {lVal, aVal},
+        // Writing back never hurts us (except for losing a cycle), so we can
+        // afford to write back both words
+        memAddrOrIOChannel: (memAddr == zeroExtend(rBRUPT) || isCSCE(memAddr)) ? tagged Addr memAddr : tagged None,
+        regNum: tagged Valid rA,
+        newZ: args.z + 1
+    };
+endfunction
+
 function Exec2Writeback dim(ExecFuncArgs args);
     Word memResp = args.memOrIOResp[15:0];
 
@@ -326,6 +413,51 @@ function Exec2Writeback dim(ExecFuncArgs args);
         eRes2: ?,
         memAddrOrIOChannel: tagged Addr memAddr,
         regNum: tagged Invalid,
+        newZ: args.z + 1
+    };
+endfunction
+
+// Double Exchange
+//The "Double Exchange" instruction exchanges the double-precision (DP) value in the
+// register-pair A,L with a value stored in the erasable memory variable pair K,K+1.
+function Exec2Writeback dxch(ExecFuncArgs args);
+    Word kResp = args.memOrIOResp[31:16];
+    Word kp1Resp = args.memOrIOResp[15:0];
+
+    Word aResp = args.regResp[31:16];
+    Word lResp = args.regResp[15:0];
+
+    Addr memAddr = zeroExtend(args.inst[10:1] - 1);
+
+    Word aVal;
+    Word lVal;
+
+    Word kVal;
+    Word kp1Val;
+
+    // If K is L, Q goes into A, A goes into L, and L goes into Q
+    if (memAddr == zeroExtend(rL)) begin
+        aVal = kp1Resp;
+        lVal = aResp;
+        kVal = aResp;
+        kp1Val = lResp;
+    end else begin
+        Bool kIsQ = (memAddr == zeroExtend(rQ));
+        aVal = kIsQ ? kResp : signExtend(kResp[15:1]);
+        lVal = signExtend(kp1Resp[15:1]);
+        kVal = kIsQ ? aResp : {overflowCorrect(aResp), 1'b0};
+        kp1Val = {overflowCorrect(lResp), 1'b0};
+    end
+
+    lVal = signExtend(overflowCorrect(lVal));
+
+    Bool isA = (memAddr == zeroExtend(rA));
+
+    return Exec2Writeback {
+        eRes1: {kp1Val, kVal},
+        eRes2: {lVal, aVal},
+        memAddrOrIOChannel: isA ? tagged None : tagged Addr memAddr,
+        regNum: isA ? tagged Invalid : tagged Valid rA,
         newZ: args.z + 1
     };
 endfunction
@@ -400,8 +532,7 @@ function Exec2Writeback regXCH(ExecFuncArgs args, RegIdx regNum);
 
     // TAGLSB
     Word newL = is16Bits ? memResp : signExtend(memResp[15:1]);
-    // TAGEXCEPTION
-    Word newMem = is16Bits ? rResp : {rResp[14:0], 0};
+    Word newMem = is16Bits ? rResp : {overflowCorrect(rResp), 1'b0};
 
     return Exec2Writeback {
         eRes1: {?, newMem},
