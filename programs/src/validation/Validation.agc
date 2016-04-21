@@ -122,7 +122,7 @@ $ValidateCCS.agc
 		#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 		# Tests 6-10 (octal):  check of DAS.
 		# TODO: Change this back to ValidateDAS.agc once we have double arithmetic.
-# $ValidateDAS.agc
+#$ValidateDAS.agc
 		INCR	ERRNUM
 		INCR	ERRNUM
 		INCR	ERRNUM
