@@ -35,6 +35,7 @@ module mkAGC(AGC);
     // Random flags
     Reg#(Maybe#(Word)) indexAddend <- mkReg(tagged Invalid);
     Reg#(Bool) isExtended <- mkReg(False);
+    Reg#(Maybe#(Word)) zFromDouble <- mkReg(tagged Invalid);
 
     function Instruction handleIndex(Instruction inst);
         if (isValid(indexAddend)) begin
@@ -232,9 +233,17 @@ module mkAGC(AGC);
 
         // Make the memory requests if necessary
         if (last.memAddrOrIOChannel matches tagged Addr .addr) begin
-            memory.storer.memStore(addr + 1, last.eRes1[31:16]);
+            Addr addrp1 = addr + 1;
+            Word res = last.eRes1[31:16];
+            memory.storer.memStore(addrp1, res);
+            // Redirect Z if necessary
+            if (addrp1 == zeroExtend(rZ)) begin
+                zFromDouble <= tagged Valid res;
+            end
         end
         if (last.regNum matches tagged Valid .regNum) begin
+            // Don't need to do the same for regs because Z can't be referred to in
+            // double instructions as a reg
             memory.storer.regStore(regNum + 1, last.eRes2[31:16]);
         end
 
@@ -248,8 +257,9 @@ module mkAGC(AGC);
         $display("e2w.first: ", fshow(last));
         e2w.deq();
 
-        // Set Z
-        memory.imem.setZ({0, last.newZ, 1'b0});
+        // Set Z.  2 because is left-shifted 1.
+        memory.imem.setZ(isValid(zFromDouble) ? zFromDouble.Valid + 2 : {0, last.newZ, 1'b0});
+        zFromDouble <= tagged Invalid;
 
         // Make the memory and I/O requests if necessary
         if (last.memAddrOrIOChannel matches tagged Addr .addr) begin

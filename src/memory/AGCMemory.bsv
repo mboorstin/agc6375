@@ -15,7 +15,7 @@ typedef 256 EBankWords;
 typedef TLog#(EBankWords) LEBankWords;
 
 typedef 36 FBanks;
-typedef TLog#(FBanks) LFBanks;
+typedef 5 LFBanks;
 typedef 1024 FBankWords;
 typedef TLog#(FBankWords) LFBankWords;
 

@@ -173,8 +173,6 @@ endfunction
 // The "Branch Zero to Fixed" instruction jumps to a memory location
 // in fixed (as opposed to erasable) memory if the accumulator is zero
 function Exec2Writeback bzf(ExecFuncArgs args);
-    // TAGEXCEPTION
-    // I *think* this is the correct handling of overflow, but should check
     Word acc = args.regResp[15:0];
 
     Bool doBranch = (acc[15] == acc[14]) && ((acc[14:0] == 0) || (acc[14:0] == ~0));
@@ -194,8 +192,6 @@ endfunction
 // The "Branch Zero or Minus to Fixed" instruction jumps to a memory
 // location in fixed (as opposed to erasable) memory if the accumulator is zero or negative.
 function Exec2Writeback bzmf(ExecFuncArgs args);
-    // TAGEXCEPTION
-    // I *think* this is the correct handling of overflow, but should check
     Word acc = args.regResp[15:0];
 
     Bool doBranch = (acc[15] == acc[14]) ? ((acc[14:0] == 0) || acc[14] == 1) : (acc[15:14] == 2'b10);

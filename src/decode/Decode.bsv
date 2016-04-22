@@ -79,7 +79,7 @@ function DecodeRes decode(Instruction inst, Bool isExtended);
                     return dSU(inst);
                 end
                 else begin //BZMF
-                    return dUNIMPLEMENTED();
+                    return dBZMF();
                 end
             end
             opMP: begin //MP
@@ -185,6 +185,14 @@ function DecodeRes dBZF();
         memAddrOrIOChannel: tagged None,
         regNum: tagged Valid rA,
         instNum: BZF
+    };
+endfunction
+
+function DecodeRes dBZMF();
+    return DecodeRes {
+        memAddrOrIOChannel: tagged None,
+        regNum: tagged Valid rA,
+        instNum: BZMF
     };
 endfunction
 
