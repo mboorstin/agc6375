@@ -36,15 +36,20 @@ function Exec2Writeback exec(ExecFuncArgs args);
         // Bunch of stuff here
         QXCH: return regXCH(args, rQ);
         // Bunch of stuff here
-        READ: return read(args);
+        RAND: return ioRead(args);
+        READ: return ioRead(args);
         RETURN: return returnFunc(args);
+        ROR: return ioRead(args);
+        RXOR: return ioRead(args);
         // Bunch of stuff here
         SU: return su(args);
         TC: return tc(args);
         TCF: return tcf(args);
         TS: return ts(args);
         // Bunch of stuff here
-        WRITE: return write(args);
+        WAND: return ioWrite(args);
+        WOR: return ioWrite(args);
+        WRITE: return ioWrite(args);
         XCH: return regXCH(args, rA);
         // Bunch of stuff here
         // Once we're done with everything, should turn into a
@@ -652,33 +657,61 @@ function Exec2Writeback ts(ExecFuncArgs args);
     };
 endfunction
 
-// READ
-// The "Read Channel KC" instruction moves the contents of an i/o channel
-// into the accumulator.
-function Exec2Writeback read(ExecFuncArgs args);
-    Word ioResp = args.memOrIOResp[15:0];
+// READ, RAND, ROR, RXOR
+// These are all IO instructions.  Sadly Bluespec doesn't have function passing, so we have
+// to use a big case statement here instead of passing in operations in exec.  Oh well.
+// A should be the IO channel response, B should be the reg (probably acc) response.
+function Bit#(n) ioReadOp(InstNum instNum, Bit#(n) a, Bit#(n) b);
+    case (instNum)
+        READ: return a;
+        RAND: return a & b;
+        ROR: return a | b;
+        RXOR: return a ^ b;
+        // Really should never hit here
+        default: return ?;
+    endcase
+endfunction
+
+function Exec2Writeback ioRead(ExecFuncArgs args);
+    Word aResp = is16BitChannel(args.inst[7:1]) ?
+                 ioReadOp(args.instNum, args.memOrIOResp[15:0], args.regResp[15:0]) :
+                 signExtend(ioReadOp(args.instNum, args.memOrIOResp[15:1], overflowCorrect(args.regResp[15:0])));
 
     return Exec2Writeback {
         eRes1: ?,
-        eRes2: {?, is16BitChannel(args.inst[7:1]) ? ioResp : signExtend(ioResp[15:1])},
+        eRes2: {?, aResp},
         memAddrOrIOChannel: tagged None,
         regNum: tagged Valid rA,
         newZ: args.z + 1
     };
 endfunction
 
-// WRITE
-// The "Write Channel KC" instruction moves the contents of the accumulator into an i/o channel.
-function Exec2Writeback write(ExecFuncArgs args);
-    Word acc = args.regResp[15:0];
-    IOChannel channel = args.inst[7:1];
+// WRITE, WAND, WOR
+// These are all IO instructions.  See the comment on ioReadOp for more info.
+function Bit#(n) ioWriteOp(InstNum instNum, Bit#(n) a, Bit#(n) b);
+    case (instNum)
+        WRITE: return b;
+        WAND: return a & b;
+        WOR: return a | b;
+        default: return ?;
+    endcase
+endfunction
 
-     //TAGEXCEPTION
+// The "Write Channel KC" instruction moves the contents of the accumulator into an i/o channel.
+function Exec2Writeback ioWrite(ExecFuncArgs args);
+    IOChannel channel = args.inst[7:1];
+    Bool is16Bits = is16BitChannel(channel);
+
+    Word resp = is16Bits ?
+                ioWriteOp(args.instNum, args.memOrIOResp[15:0], args.regResp[15:0]) :
+                signExtend(ioWriteOp(args.instNum, args.memOrIOResp[15:1], overflowCorrect(args.regResp[15:0])));
+
      return Exec2Writeback {
-        eRes1: {?, is16BitChannel(channel) ? acc : {acc[14:0], 0}},
-        eRes2: ?,
+        eRes1: is16Bits ? {?, resp} : {?, resp[14:0], 1'b0},
+        eRes2: {?, resp},
         memAddrOrIOChannel: tagged IOChannel channel,
-        regNum: tagged Invalid,
+        // Extra write to rA for WRITE doesn't hurt
+        regNum: tagged Valid rA,
         newZ: args.z + 1
      };
 endfunction

@@ -134,13 +134,13 @@ function Bool is16BitRegM(Addr a);
     return (a[11:2] == 0) && is16BitReg(truncate(a));
 endfunction
 
-function Bool is16BitChannel(IOChannel c);
-    return (c == 1) || (c == 2);
-endfunction
-
 function Bool isCSCE(Addr a);
     // Bluespec should optimize this to (a[11:5] == 0) && (a[4:1] == rCYR/rSR/rCYL/rEDOP), right???
     return (a == zeroExtend(rCYR)) || (a == zeroExtend(rSR)) || (a == zeroExtend(rCYL)) || (a == zeroExtend(rEDOP));
+endfunction
+
+function Bool is16BitChannel(IOChannel channel);
+    return (channel == zeroExtend(rL)) || (channel == zeroExtend(rQ));
 endfunction
 
 // Opcodes

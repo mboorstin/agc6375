@@ -22,19 +22,19 @@ function DecodeRes decode(Instruction inst, Bool isExtended);
                         return dWRITE();
                     end
                     qcioRAND: begin //RAND
-                        return dUNIMPLEMENTED();
+                        return dRAND(inst);
                     end
                     qcioWAND: begin //WAND
-                        return dUNIMPLEMENTED();
+                        return dWAND(inst);
                     end
                     qcioROR: begin //ROR
-                        return dUNIMPLEMENTED();
+                        return dROR(inst);
                     end
                     qcioWOR: begin //WOR
-                        return dUNIMPLEMENTED();
+                        return dWOR(inst);
                     end
                     qcioRXOR: begin //RXOR
-                        return dUNIMPLEMENTED();
+                        return dRXOR(inst);
                     end
                     qcioEDRUPT: begin //EDRUPT
                         return dEDRUPT();
@@ -362,6 +362,46 @@ function DecodeRes dWRITE();
         memAddrOrIOChannel: tagged None,
         regNum: tagged Valid rA,
         instNum: WRITE
+    };
+endfunction
+
+function DecodeRes dRAND(Instruction inst);
+    return DecodeRes {
+        memAddrOrIOChannel: tagged IOChannel inst[7:1],
+        regNum: tagged Valid rA,
+        instNum: RAND
+    };
+endfunction
+
+function DecodeRes dWAND(Instruction inst);
+    return DecodeRes {
+        memAddrOrIOChannel: tagged IOChannel inst[7:1],
+        regNum: tagged Valid rA,
+        instNum: WAND
+    };
+endfunction
+
+function DecodeRes dROR(Instruction inst);
+    return DecodeRes {
+        memAddrOrIOChannel: tagged IOChannel inst[7:1],
+        regNum: tagged Valid rA,
+        instNum: ROR
+    };
+endfunction
+
+function DecodeRes dWOR(Instruction inst);
+    return DecodeRes {
+        memAddrOrIOChannel: tagged IOChannel inst[7:1],
+        regNum: tagged Valid rA,
+        instNum: WOR
+    };
+endfunction
+
+function DecodeRes dRXOR(Instruction inst);
+    return DecodeRes {
+        memAddrOrIOChannel: tagged IOChannel inst[7:1],
+        regNum: tagged Valid rA,
+        instNum: RXOR
     };
 endfunction
 
