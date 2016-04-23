@@ -45,13 +45,13 @@ module mkArithUtilTest ();
     spin2[9] = 15'o37776;
 
     Vector#(10, DP) dpin1 = newVector;
-    dpin1[0] = 30'o00000_00000;
+    dpin1[0] = 30'o37777_00000;
     dpin1[1] = 30'o00000_77777;
     dpin1[2] = 30'o00001_00001;
     dpin1[3] = 30'o00010_10000;
     dpin1[4] = 30'o77777_40000;
     dpin1[5] = 30'o77776_00001;
-    dpin1[6] = 30'o00000_00001;
+    dpin1[6] = 30'o00001_40000;
     dpin1[7] = 30'o40300_45600;
     dpin1[8] = 30'o37777_40000;
     dpin1[9] = 30'o37776_00001;
@@ -61,13 +61,13 @@ module mkArithUtilTest ();
     end
 
     Vector#(10, DP) dpin2 = newVector;
-    dpin2[0] = 30'o00000_00000;
+    dpin2[0] = 30'o00001_00001;
     dpin2[1] = 30'o00001_00001;
     dpin2[2] = 30'o77776_00010;
     dpin2[3] = 30'o77767_00010;
     dpin2[4] = 30'o00000_00001;
     dpin2[5] = 30'o00000_00001;
-    dpin2[6] = 30'o00000_37777;
+    dpin2[6] = 30'o00000_77776;
     dpin2[7] = 30'o00000_00111;
     dpin2[8] = 30'o00000_10111;
     dpin2[9] = 30'o00000_11111;
@@ -114,6 +114,17 @@ module mkArithUtilTest ();
             //SP result = addOnesUncorrected(spin1[i], spin2[i]);
             //$display(displayDecimal(spin1[i]), $format("    +    "), displayDecimal(spin2[i]), $format("    =    "), displayDecimal(result));
             
+            //DAS test
+            Bit#(33) result_prelim = addDP(dpin1[i], dpin2[i]);
+            DP result = truncate(result_prelim);
+            Fmt fmt_result = $format("(") + displayDecimal(result[29:15]) + $format(",    ") + displayDecimal(result[14:0]) + $format(")");
+            $display(fmt1[i], $format(" + "), fmt2[i], $format(" = "), fmt_result);
+            if (result_prelim[32] == 1) begin
+                Fmt direction = (result_prelim[31] == 1) ? $format("negative ") : $format("positive ");
+                $display(direction, $format("overflow"));
+            end
+            $display(displayDecimal(16'b1));
+
             //dABS test
             //SP result = dABS(spin1[i]);
             //$display(displayDecimal(spin1[i]), $format(" => "), displayDecimal(result));
@@ -130,10 +141,10 @@ module mkArithUtilTest ();
             $display("");*/
 
             //consistent sign test
-            DP result = makeConsistentSign(dpin1[i]);
+            /*DP result = makeConsistentSign(dpin1[i]);
             Fmt fmt_result = $format("(") + displayDecimal(result[29:15]) + $format(",    ") + displayDecimal(result[14:0]) + $format(")");
             $display(fmt1[i], $format(" => "), fmt_result);
-
+            */
 
 
             //$display(displayDecimal(spin1[i]), $format("    +    "), displayDecimal(spin2[i]), $format("    =    "), displayDecimal(result));

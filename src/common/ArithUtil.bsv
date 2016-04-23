@@ -48,21 +48,12 @@ function Bit#(TAdd#(n,1)) addOnesOverflow (Bit#(n) a, Bit#(n) b)
         sum_u = addOnesCarry(truncate(sum_u), fromInteger(1));
     end
 
-    //return truncated sum.
-    //Bit#(2) topbits = truncateLSB(sum_long);
-    //msb = truncateLSB(sum_u);
-    //Bit#(1) msb2 = topbits[0];
-    //Bit#(TSub#(n,1)) trun = truncate(sum_u);
-
-    //msb == 1 is an indicator of overflow.  Overflow can only occur when inputs are the same sign.
-    //Bit#(n) sum = {msb[0], truncate(sum_u)};
-    //(msb == 0) ? {truncate(sum_u)} : {sign_a, trun};
-    
-
     return truncate(sum_u);
 
 endfunction
 
+//automatically overflow corrected
+//ones complement addition
 function Bit#(n) addOnesCorrected (Bit#(n) a, Bit#(n) b)
         provisos(Add#(a__, b__, TAdd#(n,1)),
                  Add#(1, a__, n),
@@ -77,6 +68,8 @@ function Bit#(n) addOnesCorrected (Bit#(n) a, Bit#(n) b)
     return corrected_sum;
 endfunction
 
+//non-overflow corrected
+//ones complement addition
 function Bit#(n) addOnesUncorrected (Bit#(n) a, Bit#(n) b)
         provisos(Add#(a__, b__, TAdd#(n,1)),
                  Add#(1, a__, n),
@@ -98,40 +91,17 @@ function SP overflowCorrect(Bit#(16) a);
     return result;
 endfunction
 
-//addition
-//automatically overflow-corrected
-/*function SP addOnesOverflow (SP a, SP b);
-    //
-    Bit#(16) a_ext = {a[14], a[14:0]};
-    Bit#(16) b_ext = {b[14], b[14:0]};
-    Bit#(16) uncorrected = addOnes(a_ext, b_ext);
-    SP corrected = overflowCorrect(uncorrected);
-    return corrected;
-endfunction*/
-
 //returns the sum of a and b with a carry bit as the MSB
 function Bit#(TAdd#(n,1)) addOnesCarry (Bit#(n) a, Bit#(n) b);
     //
     Bit#(TAdd#(n,1)) sum_u = {1'b0, a} + {1'b0, b};
 
     return sum_u;
-
 endfunction
-
-//returns the sum of a and b with a signed carry bit
-/*function Bit#(TAdd#(n,1)) addOnesOverflow (Bit#(n) a, Bit#(n) b)
-        provisos(Add#(1, a__, n));
-    //
-    Bit#(1) sign_a = truncateLSB(a);
-    Bit#(1) sign_b = truncateLSB(b);
-    Bit#(TAdd#(n,1)) sum_u = {sign_a, a} + {sign_b, b};
-
-    return sum_u;
-
-endfunction*/
 
 //subtraction.
 //a - b is returned.
+//version that is automatically corrected for overflow
 function Bit#(n) subOnesCorrected (Bit#(n) a, Bit#(n) b)
         provisos(Add#(a__, b__, TAdd#(n,1)),
                  Add#(1, a__, n),
@@ -140,6 +110,7 @@ function Bit#(n) subOnesCorrected (Bit#(n) a, Bit#(n) b)
     return addOnesCorrected(a, ~b);
 endfunction
 
+//version that is not automatically corrected for overflow
 function Bit#(n) subOnesUncorrected (Bit#(n) a, Bit#(n) b)
         provisos(Add#(a__, b__, TAdd#(n,1)),
                  Add#(1, a__, n),
@@ -179,6 +150,8 @@ endfunction
 
 //multiplication
 //probably faster than above
+//(if not, the reason is probably that Bluespec's compiler didn't correctly 
+//  ignore multiplying and adding of zeroes that will always be zeroes)
 function DP multOnes (SP a, SP b);
     Bit#(1) sign_a = truncateLSB(a);
     Bit#(1) sign_b = truncateLSB(b);
@@ -227,6 +200,7 @@ function DP multOnes (SP a, SP b);
     return dp;
 endfunction
 
+//this conversion function uses SIGNED two's complement
 //returns 2's complement version of the input 1's complement value
 function Bit#(n) toTwos(Bit#(n) a)
         provisos(Add#(1, a__, n));
@@ -235,6 +209,7 @@ function Bit#(n) toTwos(Bit#(n) a)
     return twos;
 endfunction
 
+//this conversion function uses SIGNED two's complement
 //returns 1's complement version of the input 2's complement value
 //does not work for a = 1000000000...0
 function Bit#(n) toOnes(Bit#(n) a)
@@ -245,7 +220,35 @@ function Bit#(n) toOnes(Bit#(n) a)
 endfunction
 
 //adding DP values
-function DP addDPCorrected(DP a, DP b);
+
+//a and b need not be consistent sign.
+//used for DAS instruction.
+//returns {overflow, sign, 31'b result.  16 bits of precision for accumulator overflow.}
+//overflow = 1 if overflow occurred
+//sign is the sign bit of the overflow
+function Bit#(33) addDP(DP a, DP b);
+    //extract individual pairs.
+    SP a_upper = a[29:15];
+    SP a_lower = a[14:0];
+    SP b_upper = b[29:15];
+    SP b_lower = b[14:0];
+
+    //perform actual additions
+    Bit#(16) upper_prelim = addOnesCorrected(signExtend(a_upper), signExtend(b_upper));
+    Bit#(16) lower_long = addOnesCorrected(signExtend(a_lower), signExtend(b_lower));
+
+    //Add on overflow from lower, if necessary
+    Bool overflow = (lower_long[15] != lower_long[14]); //overflow present?
+    Bool lower_pos = (lower_long[15] == 0); //is the lower portion positive?
+    Bit#(16) upper_corrected = lower_pos ? (addOnesCorrected(upper_prelim, 16'o00001)) : (addOnesCorrected(upper_prelim, 16'o177776));
+    Bit#(16) upper = overflow ? upper_corrected : upper_prelim;
+    Bit#(15) lower = {lower_long[15], lower_long[13:0]};
+
+    Bit#(1) overflow_bit = (upper[15] != upper[14]) ? 1 : 0;
+    Bit#(1) sign = (upper_corrected[15]);
+    return {overflow_bit, sign, upper, lower};
+endfunction
+/*function DP addDPCorrected(DP a, DP b);
     //holders
     DP a_con = makeConsistentSign(a);
     DP b_con = makeConsistentSign(b);
@@ -269,10 +272,11 @@ function DP addDPUncorrected(DP a, DP b);
     DP out = {result[28:14], result[28], result[13:0]};
 
     return out;
-endfunction
+endfunction*/
 
 
-//sometimes DP values can have inconsistent signs.  The output of this function will have consistent signs.
+//sometimes DP values can have inconsistent signs.  
+//The output of this function will have consistent signs.
 function DP makeConsistentSign(DP a);
     DP out;
 
@@ -320,7 +324,7 @@ endfunction
 
 
 
-
+//slow divider.  Uses Bluespec's default divider.
 function DP divideSlow (DP a, SP b);
     DP consistent = makeConsistentSign(a);
     DP dp;
@@ -366,6 +370,8 @@ function DP divideSlow (DP a, SP b);
     return dp;
 endfunction
 
+//multicycle divider
+//uses GetPut-type interface
 (* synthesize *)
 module mkDivider(Divider);
     //
@@ -382,6 +388,8 @@ module mkDivider(Divider);
     //30: ready to be output
     //29: waiting for input
 
+    //step calculation of the quotient
+    //fires many times, then sets stage so remainder will fire.
     rule step (stage < 5'd15);
         //scaled divisor.
         Bit#(28) shift_div = {14'b0, divisor} << stage;
@@ -403,6 +411,8 @@ module mkDivider(Divider);
         stage <= stage - 1;
     endrule
 
+    //calculate remainder
+    //fires once, right before data becomes ready.
     rule remainder (stage == 5'd31);
         //determine the remainder depending on the sign
         /* sign_q, sign_r
@@ -428,6 +438,9 @@ module mkDivider(Divider);
         stage <= 5'd30;
     endrule
 
+    //used to put data into this module
+    //if module is currently dividing, this method will override the current division
+    //this method conflicts with division rules, though, and so results may be unpredictable.
     method Action req(DP a, SP b);
         //extract information
         DP a_cons = makeConsistentSign(a);
@@ -471,6 +484,8 @@ module mkDivider(Divider);
         //
     endmethod
 
+    //used to request a response from this module
+    //will fire only if ready
     method ActionValue#(DP) resp() if (stage == 5'd30);
         //synthesize output DP value
         SP quotient =  (sign_q == 0) ? {1'b0, quo} : {1'b1, ~quo};
@@ -482,6 +497,7 @@ module mkDivider(Divider);
     endmethod
 endmodule
 
+//nice display function for ones complement values.
 function Fmt displayDecimal(Bit#(n) a)
         provisos(Add#(1, a__, n));
     Bit#(TSub#(n,1)) mag = truncate(a);
@@ -508,8 +524,6 @@ function Bit#(n) dABS(Bit#(n) x)
 
     //do operation if necessary
     Bit#(n) out_mag = (x_mag >= 1) ? (x_mag - 1) : x_mag;
-    //Bit#(TSub#(n, 1)) abs = (x[valueOf(TSub#(n, 1))] == 1) ? ~truncate(x) : truncate(x);
-    // Subtract one if appropriate
-    //return zeroExtend(((abs == 0) || (abs == 1)) ? 0 : subOnes(abs, 1));
+
     return out_mag;
 endfunction

@@ -119,7 +119,7 @@ function DecodeRes decode(Instruction inst, Bool isExtended);
             opDAS: begin //corresponds to DAS, LXCH, INCR, and ADS
                 case (qq)
                     qcDAS: begin //DAS
-                        return dUNIMPLEMENTED();//dDAS(inst);
+                        return dDAS(inst);
                     end
                     qcLXCH: begin //LXCH
                         return dRegXCH(inst, rL, LXCH);

@@ -315,13 +315,40 @@ endfunction
 // The "Double Add to Storage" instruction does a double-precision (DP) add of
 // the A,L register pair to a pair of variables in erasable memory.
 function Exec2Writeback das(ExecFuncArgs args);
-    // TODO: FIX ME!
+    //words from memory
+    Word kResp = args.memOrIOResp[31:16];
+    Word kp1Resp = args.memOrIOResp[15:0];
+    
+    Addr memAddr = args.inst[12:1] - 1;
+
+    Word rResp = args.regResp[31:16];
+    Word r2Resp = args.regResp[15:0];
+    SP aVal;
+    SP lVal;
+    SP k_sp;
+    SP kp1_sp;
+    Word new_aVal;
+    Word new_k;
+    Word new_kp1;
+
+    //extract values
+    aVal = rResp[14:0];
+    lVal = r2Resp[14:0];
+    k_sp = is16BitRegM(memAddr) ? kResp[14:0] : kResp[15:1];
+    kp1_sp = is16BitRegM(memAddr + 1) ? kp1Resp[14:0] : kp1Resp[15:1];
+
+    //perform addition
+    //TAGLSB
+    Bit#(33) result = addDP({aVal, lVal}, {k_sp, kp1_sp});
+    new_k = is16BitRegM(memAddr) ? result[30:15] : {overflowCorrect(result[30:15]), 1'b0};
+    new_kp1 = is16BitRegM(memAddr + 1) ? signExtend(result[14:0]) : {result[14:0], 1'b0};
+    new_aVal = (result[32]==1) ? ((result[31]==0) ? (16'b1) : ~(16'b1)) : (16'b0);
 
     return Exec2Writeback {
-        eRes1: ?,
-        eRes2: ?,
-        memAddrOrIOChannel: tagged None,
-        regNum: tagged Invalid,
+        eRes1: {new_kp1, new_k},
+        eRes2: {16'b0, new_aVal},
+        memAddrOrIOChannel: tagged Addr memAddr,
+        regNum: tagged Valid rA,
         newZ: args.z + 1
     };
 endfunction
