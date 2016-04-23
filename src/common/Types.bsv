@@ -268,3 +268,11 @@ typedef enum {
 function Bool isDoubleInst(InstNum inst);
     return (inst == DAS) || (inst == DXCH) || (inst == DCA) || (inst == DCS);
 endfunction
+
+function Bool isDoubleRead(InstNum inst);
+    return (isDoubleInst(inst));
+endfunction
+
+function Bool isDoubleWrite(InstNum inst);
+    return (isDoubleInst(inst) || (inst == MP));
+endfunction

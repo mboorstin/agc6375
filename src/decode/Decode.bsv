@@ -52,7 +52,7 @@ function DecodeRes decode(Instruction inst, Bool isExtended);
             opMSU: begin //corresponds to MSU, QXCH, AUG, and DIM
                 case(qq)
                     qcMSU: begin //MSU
-                        return dUNIMPLEMENTED();
+                        return dMSU(inst);
                     end
                     qcQXCH: begin //QXCH
                         return dRegXCH(inst, rQ, QXCH);
@@ -83,7 +83,7 @@ function DecodeRes decode(Instruction inst, Bool isExtended);
                 end
             end
             opMP: begin //MP
-                return dUNIMPLEMENTED();
+                return dMP(inst);
             end
         endcase
     end
@@ -306,6 +306,22 @@ function DecodeRes dMASK(Instruction inst);
         memAddrOrIOChannel: tagged Addr inst[12:1],
         regNum: tagged Valid rA,
         instNum: MASK
+    };
+endfunction
+
+function DecodeRes dMP(Instruction inst);
+    return DecodeRes {
+        memAddrOrIOChannel: tagged Addr zeroExtend(inst[12:1]),
+        regNum: tagged Valid rA,
+        instNum: MP
+    };
+endfunction
+
+function DecodeRes dMSU(Instruction inst);
+    return DecodeRes {
+        memAddrOrIOChannel: tagged Addr zeroExtend(inst[10:1]),
+        regNum: tagged Valid rA,
+        instNum: MSU
     };
 endfunction
 

@@ -33,6 +33,8 @@ function Exec2Writeback exec(ExecFuncArgs args);
         INHINT: return inhint(args);
         LXCH: return regXCH(args, rL);
         MASK: return mask(args);
+        MP: return mp(args);
+        MSU: return msu(args);
         // Bunch of stuff here
         QXCH: return regXCH(args, rQ);
         // Bunch of stuff here
@@ -594,6 +596,68 @@ function Exec2Writeback mask(ExecFuncArgs args);
         eRes1: ?,
         eRes2: {?, newA},
         memAddrOrIOChannel: tagged None,
+        regNum: tagged Valid rA,
+        newZ: args.z + 1
+    };
+endfunction
+
+//MP
+//A and K contain SP values
+//
+function Exec2Writeback mp(ExecFuncArgs args);
+    Word memResp = args.memOrIOResp[15:0];
+    Word aResp = args.regResp[15:0];
+
+    Addr memAddr = args.inst[12:1];
+
+    //extract SP values.  Accumulator is overflow-adjusted.
+    SP a = overflowCorrect(aResp);
+    SP b = is16BitRegM(memAddr) ? overflowCorrect(memResp) : memResp[15:1];
+
+    DP result = multOnes(a, b);
+
+    Word newA = signExtend(result[29:15]);
+    Word newL = signExtend(result[14:0]);
+
+    //
+
+    return Exec2Writeback {
+        eRes1: ?,
+        eRes2: {newL, newA},
+        memAddrOrIOChannel: tagged None,
+        regNum: tagged Valid rA,
+        newZ: args.z + 1
+    };
+endfunction
+
+//MSU
+//A and K are assumed to contain 2's complement unsigned values
+//A and K are subtracted as 1's complement values and the answer is stored in A
+//A is overflow-corrected iff K is 15-bit.
+function Exec2Writeback msu(ExecFuncArgs args);
+    Word memResp = args.memOrIOResp[15:0];
+    Word aResp = args.regResp[15:0];
+
+    Addr memAddr = {2'b0, args.inst[10:1]};
+
+    Word newA;
+
+    if (memAddr == zeroExtend(rQ)) begin //apparently the use of 16-bit values is unique to Q?
+        Bit#(16) a = aResp;
+        Bit#(16) b = memResp;
+        Bit#(16) result = subOnesCorrected(a, b);
+        newA = result;
+    end else begin
+        Bit#(15) a = overflowCorrect(aResp);
+        Bit#(15) b = memResp[15:1];
+        Bit#(15) result = subOnesCorrected(a, b);
+        newA = signExtend(result);
+    end
+
+    return Exec2Writeback {
+        eRes1: {?, memResp},
+        eRes2: {?, newA},
+        memAddrOrIOChannel: tagged Addr memAddr,
         regNum: tagged Valid rA,
         newZ: args.z + 1
     };

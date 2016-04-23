@@ -127,7 +127,7 @@ module mkAGC(AGC);
         };
 
         // Set the new stage
-        if (isDoubleInst(decoded.instNum)) begin
+        if (isDoubleRead(decoded.instNum)) begin
             d2dd.enq(d2eArgs);
             stage <= DecodeDouble;
         end else begin
@@ -222,7 +222,7 @@ module mkAGC(AGC);
         e2w.enq(execRes);
 
         // Set the new stage
-        stage <= isDoubleInst(decoded.instNum) ? WritebackDouble : Writeback;
+        stage <= isDoubleWrite(decoded.instNum) ? WritebackDouble : Writeback;
     endrule
 
     rule writebackDouble((stage == WritebackDouble) && memory.init.done);
