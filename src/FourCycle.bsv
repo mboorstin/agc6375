@@ -16,6 +16,7 @@ typedef enum {
     Exec,
     WritebackDouble,
     Writeback,
+    WritebackDivide,
     Finished
 } Stage deriving(Eq, Bits, FShow);
 
@@ -36,6 +37,9 @@ module mkAGC(AGC);
     Reg#(Maybe#(Word)) indexAddend <- mkReg(tagged Invalid);
     Reg#(Bool) isExtended <- mkReg(False);
     Reg#(Maybe#(Word)) zFromDouble <- mkReg(tagged Invalid);
+
+    // Divide handling
+    Divider divider <- mkDivider();
 
     function Instruction handleIndex(Instruction inst);
         if (isValid(indexAddend)) begin
@@ -218,11 +222,20 @@ module mkAGC(AGC);
         // Set the index addend if necessary
         indexAddend <= (decoded.instNum == INDEX) ? tagged Valid execRes.eRes2[15:0] : tagged Invalid;
 
+        if (decoded.instNum == DV) begin
+            // Handle division
+            DP dividend = {overflowCorrect(last.fromRegForDouble), overflowCorrect(regRespLower)};
+            SP divisor = is16BitRegM(decoded.memAddrOrIOChannel.Addr) ? overflowCorrect(last.fromMemForDouble) : last.fromMemForDouble[15:1];
+            $display("In exec: Dividend: %x, divisor: %x", dividend, divisor);
+            divider.req(dividend, divisor);
+            stage <= WritebackDivide;
+        end else begin
+            // Set the new stage
+            stage <= isDoubleWrite(decoded.instNum) ? WritebackDouble : Writeback;
+        end
+
         // Notifiy writeback
         e2w.enq(execRes);
-
-        // Set the new stage
-        stage <= isDoubleWrite(decoded.instNum) ? WritebackDouble : Writeback;
     endrule
 
     rule writebackDouble((stage == WritebackDouble) && memory.init.done);
@@ -270,6 +283,27 @@ module mkAGC(AGC);
         if (last.regNum matches tagged Valid .regNum) begin
             memory.storer.regStore(regNum, last.eRes2[15:0]);
         end
+
+        // Set the new stage
+        stage <= Fetch;
+    endrule
+
+    rule writebackDivide((stage == WritebackDivide) && memory.init.done);
+        $display("WritebackDivide-----------------------------------------------------------------------------------");
+        // Get the data from execute - we really only need z
+        Exec2Writeback last = e2w.first();
+        $display("e2w.first: ", fshow(last));
+        e2w.deq();
+
+        // Get the data back from divide
+        DP result <- divider.resp();
+
+        // Because we can only write one register at a time, we use both memStore and regStore
+        memory.storer.memStore(zeroExtend(rA), signExtend(result[29:15]));
+        memory.storer.regStore(rL, signExtend(result[14:0]));
+
+        // Set the new Z
+        memory.imem.setZ({0, last.newZ, 1'b0});
 
         // Set the new stage
         stage <= Fetch;

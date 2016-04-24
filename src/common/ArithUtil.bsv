@@ -40,7 +40,7 @@ function Bit#(TAdd#(n,1)) addOnesOverflow (Bit#(n) a, Bit#(n) b)
 
 
     Bit#(TAdd#(n,2)) sum_u = addOnesCarry(a_long, b_long);
-    
+
     Bit#(2) msb = truncateLSB(sum_u);
 
     if (msb[1] == 1) begin //if the carry bit overflows to the left
@@ -150,7 +150,7 @@ endfunction
 
 //multiplication
 //probably faster than above
-//(if not, the reason is probably that Bluespec's compiler didn't correctly 
+//(if not, the reason is probably that Bluespec's compiler didn't correctly
 //  ignore multiplying and adding of zeroes that will always be zeroes)
 function DP multOnes (SP a, SP b);
     Bit#(1) sign_a = truncateLSB(a);
@@ -275,7 +275,7 @@ function DP addDPUncorrected(DP a, DP b);
 endfunction*/
 
 
-//sometimes DP values can have inconsistent signs.  
+//sometimes DP values can have inconsistent signs.
 //The output of this function will have consistent signs.
 function DP makeConsistentSign(DP a);
     DP out;
@@ -311,7 +311,7 @@ function DP makeConsistentSign(DP a);
 
                 new_low = addOnesUncorrected(low, 15'b100_000_000_000_000);
             end
-            
+
         end
 
         out = {new_high, new_low}; //new value (should be equivalent to old value)
@@ -403,7 +403,9 @@ module mkDivider(Divider);
             dividend <= dividend - shift_div;
             quo <= (quo << 1) + 1; //the answer for this bit is 1
         end
-        
+
+        $display("Step Dividend: ", displayDecimal(dividend));
+
 
         //increment stage; the next time this rule is executed,
         //shift_div will be one to the right.
@@ -421,17 +423,22 @@ module mkDivider(Divider);
         * 10: a negative, b positive, remainder = inverted
         * 11: a positive, b negative, remainder = inverted
         */
-        if (sign_q == 0) begin // |quotient * b| < |a|  
+        if (sign_q == 0) begin // |quotient * b| < |a|
             rem <= truncate(dividend);
         end
-        else begin             // |quotient * b| > |a| 
+        else begin             // |quotient * b| > |a|
             //remainder = divisor - dividend
             //divisor > dividend at this point
             if (divisor <= truncate(dividend)) begin
                 $display("Divider: error, divisor is not greater than remainder");
             end
-            quo <= quo + 1;
-            rem <= divisor - truncate(dividend);
+            $display("Remainder Quotient: ", displayDecimal(quo));
+            if (quo != signExtend(1'b1)) begin
+                quo <= quo + 1;
+                rem <= divisor - truncate(dividend);
+            end else begin
+                rem <= truncate(dividend);
+            end
         end
 
         //now ready to be output!
@@ -444,8 +451,8 @@ module mkDivider(Divider);
     method Action req(DP a, SP b);
         //extract information
         DP a_cons = makeConsistentSign(a);
-        //Fmt a_cons_fmt = $format("(") + displayDecimal(a_cons[29:15]) + $format(",    ") + displayDecimal(a_cons[14:0]) + $format(")");
-        //$display(a_cons_fmt);
+        Fmt a_cons_fmt = $format("(") + displayDecimal(a_cons[29:15]) + $format(",    ") + displayDecimal(a_cons[14:0]) + $format(")");
+        $display(a_cons_fmt, $format(" / "), displayDecimal(b));
 
         Bit#(1) sign_a = truncateLSB(a_cons); //input signs
         Bit#(1) sign_b = truncateLSB(b);
@@ -490,6 +497,8 @@ module mkDivider(Divider);
         //synthesize output DP value
         SP quotient =  (sign_q == 0) ? {1'b0, quo} : {1'b1, ~quo};
         SP remainder = (sign_r == 0) ? {1'b0, rem} : {1'b1, ~rem};
+
+        $display(displayDecimal(quotient), $format(" , "), displayDecimal(remainder));
         //set stage to wait for input
         stage <= 5'd29;
 
@@ -517,7 +526,7 @@ endfunction
 //  DABS(x)=|x|-1 if |x|>1, or +0 otherwise.
 function Bit#(n) dABS(Bit#(n) x)
         provisos(Add#(1, a__, n));
-    
+
     //extract sign bit and magnitude
     Bit#(1) sign_x = truncateLSB(x);
     Bit#(n) x_mag = (sign_x == 0) ? x : ~x;

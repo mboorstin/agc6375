@@ -43,7 +43,7 @@ function DecodeRes decode(Instruction inst, Bool isExtended);
             end
             opDV: begin //corresponds to DV and BZF
                 if (qq == qcDV) begin //DV
-                    return dUNIMPLEMENTED();
+                    return dDV(inst);
                 end
                 else begin //BZF
                     return dBZF();
@@ -58,10 +58,10 @@ function DecodeRes decode(Instruction inst, Bool isExtended);
                         return dRegXCH(inst, rQ, QXCH);
                     end
                     qcAUG: begin //AUG
-                        return dUNIMPLEMENTED();
+                        return dAUG(inst);
                     end
                     qcDIM: begin //DIM
-                        return dUNIMPLEMENTED();
+                        return dDIM(inst);
                     end
                 endcase
             end
@@ -180,6 +180,14 @@ function DecodeRes dADS(Instruction inst);
     };
 endfunction
 
+function DecodeRes dAUG(Instruction inst);
+    return DecodeRes {
+        memAddrOrIOChannel: tagged Addr zeroExtend(inst[10:1]),
+        regNum: tagged Invalid,
+        instNum: AUG
+    };
+endfunction
+
 function DecodeRes dBZF();
     return DecodeRes {
         memAddrOrIOChannel: tagged None,
@@ -244,11 +252,28 @@ function DecodeRes dDCS(Instruction inst);
     };
 endfunction
 
+function DecodeRes dDIM(Instruction inst);
+    return DecodeRes {
+        memAddrOrIOChannel: tagged Addr zeroExtend(inst[10:1]),
+        regNum: tagged Invalid,
+        instNum: DIM
+    };
+endfunction
+
+
 function DecodeRes dDXCH(Instruction inst);
     return DecodeRes {
         memAddrOrIOChannel: tagged Addr zeroExtend(inst[10:1] - 1),
         regNum: tagged Valid rA,
         instNum: DXCH
+    };
+endfunction
+
+function DecodeRes dDV(Instruction inst);
+    return DecodeRes {
+        memAddrOrIOChannel: tagged Addr zeroExtend(inst[12:1]),
+        regNum: tagged Valid rA,
+        instNum: DV
     };
 endfunction
 

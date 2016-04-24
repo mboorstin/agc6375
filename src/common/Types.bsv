@@ -266,7 +266,9 @@ typedef enum {
 } InstNum deriving (Eq, Bits, FShow);
 
 function Bool isDoubleInst(InstNum inst);
-    return (inst == DAS) || (inst == DXCH) || (inst == DCA) || (inst == DCS);
+    // Yes, it's kind of shitty that we're spending an extra cycle to do a
+    // register read.  Oh well.
+    return (inst == DAS) || (inst == DXCH) || (inst == DCA) || (inst == DCS) || (inst == DV);
 endfunction
 
 function Bool isDoubleRead(InstNum inst);

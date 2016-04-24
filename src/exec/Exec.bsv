@@ -26,6 +26,7 @@ function Exec2Writeback exec(ExecFuncArgs args);
         DCS: return dcs(args);
         DXCH: return dxch(args);
         DIM: return dim(args);
+        DV: return dv(args);
         // Bunch of stuff here
         INCR: return incr(args);
         INDEX: return index(args);
@@ -320,7 +321,7 @@ function Exec2Writeback das(ExecFuncArgs args);
     //words from memory
     Word kResp = args.memOrIOResp[31:16];
     Word kp1Resp = args.memOrIOResp[15:0];
-    
+
     Addr memAddr = args.inst[12:1] - 1;
 
     Word rResp = args.regResp[31:16];
@@ -346,11 +347,13 @@ function Exec2Writeback das(ExecFuncArgs args);
     new_kp1 = is16BitRegM(memAddr + 1) ? signExtend(result[14:0]) : {result[14:0], 1'b0};
     new_aVal = (result[32]==1) ? ((result[31]==0) ? (16'b1) : ~(16'b1)) : (16'b0);
 
+    Bool isDDOUBL = (memAddr == 0);
+
     return Exec2Writeback {
         eRes1: {new_kp1, new_k},
         eRes2: {16'b0, new_aVal},
         memAddrOrIOChannel: tagged Addr memAddr,
-        regNum: tagged Valid rA,
+        regNum: isDDOUBL ? tagged Invalid : (tagged Valid rA),
         newZ: args.z + 1
     };
 endfunction
@@ -488,6 +491,18 @@ function Exec2Writeback dxch(ExecFuncArgs args);
         eRes2: {lVal, aVal},
         memAddrOrIOChannel: isA ? tagged None : tagged Addr memAddr,
         regNum: isA ? tagged Invalid : tagged Valid rA,
+        newZ: args.z + 1
+    };
+endfunction
+
+// DV
+// Most of this is handled in the processor, this just saves Z
+function Exec2Writeback dv(ExecFuncArgs args);
+    return Exec2Writeback {
+        eRes1: ?,
+        eRes2: ?,
+        memAddrOrIOChannel: ?,
+        regNum: ?,
         newZ: args.z + 1
     };
 endfunction

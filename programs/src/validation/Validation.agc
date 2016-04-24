@@ -122,9 +122,6 @@ $ValidateCCS.agc
 		#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 		# Tests 6-10 (octal):  check of DAS.
 $ValidateDAS.agc
-		INCR	ERRNUM
-		INCR	ERRNUM
-		INCR	ERRNUM
 
 		#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 		# Test 11:  check of LXCH.
