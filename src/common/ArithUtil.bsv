@@ -83,11 +83,14 @@ function Bit#(n) addOnesUncorrected (Bit#(n) a, Bit#(n) b)
 endfunction
 
 //overflow correction of a value like that in the accumulator
-//bit 15 is only used for overflow correction / checking
+//bit n-1 is only used for overflow correction / checking
 //usual use case is transferring an accumulator value outside
 //running it on a value which has not overflowed should return the same value.
-function SP overflowCorrect(Bit#(16) a);
-    SP result = {a[15],a[13:0]}; //extract magnitude bits and corrected sign bit from a
+function Bit#(TSub#(n, 1)) overflowCorrect(Bit#(n) a)
+        provisos(Add#(1, a__, n));
+    Bit#(1) msb = truncateLSB(a);
+    Bit#(TSub#(n,2)) mag = truncate(a);
+    Bit#(TSub#(n,1)) result = {msb, mag}; //extract magnitude bits and corrected sign bit from a
     return result;
 endfunction
 
@@ -117,6 +120,23 @@ function Bit#(n) subOnesUncorrected (Bit#(n) a, Bit#(n) b)
                  Add#(c__, a__, TAdd#(n,2)));
     //invert b, add.
     return addOnesUncorrected(a, ~b);
+endfunction
+
+//for MSU
+//takes in a and b, both in 2's complement, and subtracts them.
+function Bit#(n) modularSubtract(Bit#(n) a, Bit#(n) b)
+        provisos(Add#(a__, 1, n));
+    Bool pos = (a >= b);
+    Bit#(n) u_result = pos ? (a - b) : (b - a); //unsigned answer
+    if (u_result == signExtend(1'b1)) begin //handle special edge case to give +0
+        u_result = zeroExtend(1'b0);
+    end
+
+    //add sign
+    Bit#(TSub#(n, 1)) result_trunc = truncate(u_result);
+    Bit#(n) result = pos ? {1'b0, result_trunc} : {1'b1, ~result_trunc};
+
+    return result;
 endfunction
 
 //multiplication
@@ -424,24 +444,6 @@ module mkDivider(Divider);
         * 11: a positive, b negative, remainder = inverted
         */
         rem <= truncate(dividend);
-
-        /*if (sign_q == 0) begin // |quotient * b| < |a|
-            rem <= truncate(dividend);
-        end
-        else begin             // |quotient * b| > |a|
-            //remainder = divisor - dividend
-            //divisor > dividend at this point
-            if (divisor <= truncate(dividend)) begin
-                $display("Divider: error, divisor is not greater than remainder");
-            end
-            $display("Remainder Quotient: ", displayDecimal(quo));
-            if (quo != signExtend(1'b1)) begin
-                quo <= quo + 1;
-                rem <= divisor - truncate(dividend);
-            end else begin
-                rem <= truncate(dividend);
-            end
-        end*/
 
         //now ready to be output!
         stage <= 5'd30;

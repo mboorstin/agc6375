@@ -657,15 +657,37 @@ function Exec2Writeback msu(ExecFuncArgs args);
 
     Word newA;
 
-    if (memAddr == zeroExtend(rQ)) begin //apparently the use of 16-bit values is unique to Q?
+    if (memAddr == zeroExtend(rQ)) begin //just Q
         Bit#(16) a = aResp;
         Bit#(16) b = memResp;
-        Bit#(16) result = subOnesCorrected(a, b);
+        Bit#(16) result = modularSubtract(a, b);
+
+        if (~result == 16'b0) begin
+            result = ~result;
+        end
+
         newA = result;
+    end else if (is16BitRegM(memAddr)) begin //not 100% sure that this is the desired functionality.
+                                                //if MSU L is acting strangely, it's possible that 
+                                                //it's supposed to use 16 bit values instead.
+        Bit#(15) a = overflowCorrect(aResp);
+        Bit#(15) b = overflowCorrect(memResp[15:0]);
+        Bit#(15) result = modularSubtract(a, b);
+
+        if (~result == 15'b0) begin
+            result = ~result;
+        end
+
+        newA = signExtend(result);
     end else begin
         Bit#(15) a = overflowCorrect(aResp);
         Bit#(15) b = memResp[15:1];
-        Bit#(15) result = subOnesCorrected(a, b);
+        Bit#(15) result = modularSubtract(a, b);
+
+        if (~result == 15'b0) begin
+            result = ~result;
+        end
+
         newA = signExtend(result);
     end
 
