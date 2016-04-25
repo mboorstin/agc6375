@@ -41,6 +41,7 @@ function Exec2Writeback exec(ExecFuncArgs args);
         // Bunch of stuff here
         RAND: return ioRead(args);
         READ: return ioRead(args);
+        RELINT: return relint(args);
         RETURN: return returnFunc(args);
         ROR: return ioRead(args);
         RXOR: return ioRead(args);
@@ -697,6 +698,18 @@ function Exec2Writeback msu(ExecFuncArgs args);
         eRes2: {?, newA},
         memAddrOrIOChannel: tagged Addr memAddr,
         regNum: tagged Valid rA,
+        newZ: args.z + 1
+    };
+endfunction
+
+// RELINT
+// Enable interrupts.  For now, doing nothing.
+function Exec2Writeback relint(ExecFuncArgs args);
+    return Exec2Writeback {
+        eRes1: ?,
+        eRes2: ?,
+        memAddrOrIOChannel: tagged None,
+        regNum: tagged Invalid,
         newZ: args.z + 1
     };
 endfunction

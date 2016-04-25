@@ -95,7 +95,7 @@ function DecodeRes decode(Instruction inst, Bool isExtended);
                         return dRETURN();
                     end
                     3: begin // RELINT
-                        return dUNIMPLEMENTED();
+                        return dRELINT();
                     end
                     4: begin // INHINT
                         return dINHINT();
@@ -347,6 +347,15 @@ function DecodeRes dMSU(Instruction inst);
         memAddrOrIOChannel: tagged Addr zeroExtend(inst[10:1]),
         regNum: tagged Valid rA,
         instNum: MSU
+    };
+endfunction
+
+// For now, completely ignoring interrupts
+function DecodeRes dRELINT();
+    return DecodeRes {
+        memAddrOrIOChannel: tagged None,
+        regNum: tagged Invalid,
+        instNum: RELINT
     };
 endfunction
 
