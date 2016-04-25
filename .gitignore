@@ -2,6 +2,8 @@ build/
 out
 out.so
 simOut
+simOut.gz
+simOut.tar.gz
 *.html
 *.lst
 
