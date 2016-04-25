@@ -423,7 +423,9 @@ module mkDivider(Divider);
         * 10: a negative, b positive, remainder = inverted
         * 11: a positive, b negative, remainder = inverted
         */
-        if (sign_q == 0) begin // |quotient * b| < |a|
+        rem <= truncate(dividend);
+
+        /*if (sign_q == 0) begin // |quotient * b| < |a|
             rem <= truncate(dividend);
         end
         else begin             // |quotient * b| > |a|
@@ -439,7 +441,7 @@ module mkDivider(Divider);
             end else begin
                 rem <= truncate(dividend);
             end
-        end
+        end*/
 
         //now ready to be output!
         stage <= 5'd30;
@@ -457,7 +459,7 @@ module mkDivider(Divider);
         Bit#(1) sign_a = truncateLSB(a_cons); //input signs
         Bit#(1) sign_b = truncateLSB(b);
         sign_q <= (sign_a == sign_b) ? (0) : (1); //output signs
-        sign_r <= sign_b;
+        
 
         //unsigned a and b magnitudes
         //these have a leading zero (positive)
@@ -472,12 +474,14 @@ module mkDivider(Divider);
             stage <= 5'd30;
             quo <= 14'd12;
             rem <= 14'd12;
+            sign_r <= sign_a;
         end
         else if ({u_b, 14'b0} == u_a) begin //if divisor == divident
             //outputs
             stage <= 5'd30;
             quo <= 14'o37777;
             rem <= u_b;
+            sign_r <= sign_b;
         end
         else begin //no special cases; do the division
             //set registers
@@ -485,6 +489,7 @@ module mkDivider(Divider);
             rem <= 0;
             dividend <= u_a;
             divisor <= u_b;
+            sign_r <= sign_a;
             stage <= 5'd14;
         end
 
