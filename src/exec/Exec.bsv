@@ -111,21 +111,21 @@ function Exec2Writeback ads(ExecFuncArgs args);
     //mem_resp is the value to be added to the accumulator.
     //TAGLSB
     //Word mem_val = {mem_resp[15], truncateLSB(mem_resp)};
-    Word mem_val = is16BitRegM(memAddr) ? mem_resp : {mem_resp[15], mem_resp[15:1]};
+    Bool is16Bits = is16BitRegM(memAddr);
+    Word mem_val = is16Bits ? mem_resp : {mem_resp[15], mem_resp[15:1]};
 
     Word sum = addOnesUncorrected(mem_val, reg_resp); //assume values are extended left
-    SP sum_c = overflowCorrect(sum);
+    Word memRes = is16Bits ? sum : {overflowCorrect(sum), 1'b0};
 
     if (sum[15] != sum[14]) begin
         //overflow-- TAGEXCEPTION
     end
 
     //return
-    Addr mem_addr_wb = {2'b0, args.inst[10:1]}; //10 bit k, from instruction
     Exec2Writeback e2w = Exec2Writeback{
-        eRes1: {?, sum_c, 1'b0}, //TAGLSB
+        eRes1: {?, memRes}, //TAGLSB
         eRes2: {?, sum}, //write sum back to both
-        memAddrOrIOChannel: tagged Addr mem_addr_wb,
+        memAddrOrIOChannel: tagged Addr memAddr,
         regNum: tagged Valid rA, //accumulator
         newZ: args.z + 1
     };
@@ -372,14 +372,15 @@ function Exec2Writeback dca(ExecFuncArgs args);
 
     // If is L, both A and L get Q
     if (memAddr == zeroExtend(rL)) begin
-        aVal = kp1Resp;
-        lVal = kp1Resp;
+        // A and L get the overflow-corrected version of Q because "DCA L" is actually defined as
+        // "load L with Q, then A with L", and DCA writes overflow corrected values to L
+        Word corrected = signExtend(overflowCorrect(kp1Resp));
+        aVal = corrected;
+        lVal = corrected;
     end else begin
         aVal = is16BitRegM(memAddr) ? kResp : signExtend(kResp[15:1]);
-        lVal = is16BitRegM(memAddr + 1) ? kp1Resp : signExtend(kp1Resp[15:1]);
+        lVal = signExtend(overflowCorrect(is16BitRegM(memAddr + 1) ? kp1Resp : signExtend(kp1Resp[15:1])));
     end
-
-    lVal = signExtend(overflowCorrect(lVal));
 
     return Exec2Writeback {
         eRes1: args.memOrIOResp,
@@ -668,7 +669,7 @@ function Exec2Writeback msu(ExecFuncArgs args);
 
         newA = result;
     end else if (is16BitRegM(memAddr)) begin //not 100% sure that this is the desired functionality.
-                                                //if MSU L is acting strangely, it's possible that 
+                                                //if MSU L is acting strangely, it's possible that
                                                 //it's supposed to use 16 bit values instead.
         Bit#(15) a = overflowCorrect(aResp);
         Bit#(15) b = overflowCorrect(memResp[15:0]);
@@ -707,9 +708,9 @@ function Exec2Writeback returnFunc(ExecFuncArgs args);
 
     return Exec2Writeback {
         eRes1: ?,
-        eRes2: ?,
+        eRes2: {?, 16'h3},
         memAddrOrIOChannel: tagged None,
-        regNum: tagged Invalid,
+        regNum: tagged Valid rQ,
         newZ: newAddr + 1
     };
 endfunction
