@@ -9,7 +9,7 @@ import Types::*;
 // get/set rL and rQ here, because they're the only ones we're guaranteed to not have
 // a conflict with (because we can never request IO and memory in the same instruction)
 
-module mkAGCIO(DMemoryFetcher fetcher, DMemoryStorer storer, AGCIO ifc);
+module mkAGCIO(DMemoryFetcher fetcher, DMemoryStorer storer, MemInitIfc init, AGCIO ifc);
     // We use a 128 word BRAM to buffer the state of the IO
     // channels, since we obviously can't have a bunch of physical
     // wires that the AGC can read from at will
@@ -29,7 +29,8 @@ module mkAGCIO(DMemoryFetcher fetcher, DMemoryStorer storer, AGCIO ifc);
     Reg#(Bool) respFromFetcher <- mkReg(False);
 
     interface HostIO hostIO;
-        method ActionValue#(IOPacket) agcToHost;
+        // Maybe guard here?  Change it to a Pipeline FIFO?
+        method ActionValue#(IOPacket) agcToHost if (init.done);
             agcToHostQ.deq();
             return agcToHostQ.first();
         endmethod
@@ -50,7 +51,7 @@ module mkAGCIO(DMemoryFetcher fetcher, DMemoryStorer storer, AGCIO ifc);
     endinterface
 
     interface InternalIO internalIO;
-        method Action readReq(IOChannel channel);
+        method Action readReq(IOChannel channel) if (init.done);
             Bool lOrQ = is16BitChannel(channel);
             respFromFetcher <= lOrQ;
             if (lOrQ) begin
@@ -65,12 +66,12 @@ module mkAGCIO(DMemoryFetcher fetcher, DMemoryStorer storer, AGCIO ifc);
             end
         endmethod
 
-        method ActionValue#(Word) readResp();
+        method ActionValue#(Word) readResp() if (init.done);
             Word ret <- respFromFetcher ? fetcher.memResp() : ioBuffer.portB.response.get();
             return ret;
         endmethod
 
-        method Action write(IOChannel channel, Word data);
+        method Action write(IOChannel channel, Word data) if (init.done);
             Bool lOrQ = is16BitChannel(channel);
             if (lOrQ) begin
                 storer.memStore(zeroExtend(channel), data);

@@ -24,7 +24,7 @@ typedef enum {
 module mkAGC(AGC);
     // General state
     AGCMemory memory <- mkAGCMemory();
-    AGCIO io <- mkAGCIO(memory.fetcher, memory.storer);
+    AGCIO io <- mkAGCIO(memory.fetcher, memory.storer, memory.init);
 
     // Stage management
     Reg#(Stage) stage <- mkReg(Init);

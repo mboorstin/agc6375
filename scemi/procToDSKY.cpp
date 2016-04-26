@@ -31,10 +31,14 @@
 void initIO(InportProxyT<IOPacket>* ioInit) {
     IOPacket initMessage;
 
+    printf("Starting I/O initialization...\n");
+
     // Should do something fancier if necessary
     initMessage.m_channel = 032;
     initMessage.m_data = 0x2000;
     ioInit->sendMessage(initMessage);
+
+    printf("Finished I/O initialization\n");
 }
 
 // Initialize the AGC's BRAM to the contents of the given program
@@ -157,6 +161,7 @@ void* runDSKYListener(void* arg) {
     listen(args->serverFD, 1);
     while (true) {
         // accept blocks until we have a connection, so we can just wait to start the processor
+        printf("A\n");
         int dskyFD = accept(args->serverFD, (struct sockaddr*)&client, &clientLen);
         *(args->dskyFD) = dskyFD;
 
@@ -165,6 +170,8 @@ void* runDSKYListener(void* arg) {
             started = true;
             args->start->sendMessage(AGC_START_IP);
         }
+
+        printf("B\n");
 
         while (true) {
             if (read(dskyFD, &inBuf, sizeof(DSKYPacket)) < sizeof(DSKYPacket)) {

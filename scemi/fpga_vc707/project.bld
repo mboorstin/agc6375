@@ -1,0 +1,46 @@
+[DEFAULT]
+default-targets:     all
+bsc-compile-options: -aggressive-conditions -keep-fires
+bsc-link-options:    -keep-fires
+
+[common]
+hide-target
+top-module:             mkBridge
+top-file:               ../Bridge.bsv
+bsv-source-directories: ../../scemi ../../src ../../src/common ../../src/includes ../../src/memory ../../src/exec ../../src/decode ../../src/io
+verilog-directory:      build/vlog_dut
+binary-directory:       build/bdir_dut
+simulation-directory:   build/simdir_dut
+info-directory:         build/info_dut
+log-directory:          build/logs
+altera-directory:       build/quartus
+xilinx-directory:       build/xilinx
+scemi-parameters-file:  build/scemi.params
+
+[dut]
+hide-target
+extends-target: common
+
+[agc_common]
+hide-target
+extends-target:               dut
+build-for:                    vc707
+scemi-type:                   PCIE_VIRTEX7
+xilinx-use-planahead
+xilinx-map-options:           -detail
+post-targets:                 procToDSKY
+
+[fourcycle]
+extends-target:           agc_common
+bsv-define:               AGC_FILE=FourCycle
+workstation-project-file: build/fourcycle.bspec
+
+[procToDSKY]
+extends-target:       common
+scemi-tb
+build-for:            c++
+c++-header-directory: build/procToDSKYInclude
+c++-header-aliases
+c++-files:            ../procToDSKY.cpp ../ResetXactor.cpp
+exe-file:             build/bin/procToDSKY
+
