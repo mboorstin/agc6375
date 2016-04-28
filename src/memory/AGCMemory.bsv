@@ -30,9 +30,11 @@ module mkAGCMemory(AGCMemory);
     // Load a VMH in simulation so we don't have to transfer it over SceMi
     `ifdef SIM
         cfg.loadFormat = Hex("program.vmh");
+    `else
+        cfg.loadFormat = Hex("/afs/athena.mit.edu/user/b/o/boorstin/6.375_nfs/project/scemi/fpga_vc707/program.vmh");
     `endif
 
-    BRAM2Port#(MemAddr, Word) bram <- mkBRAM2Server(cfg);
+    BRAM1Port#(MemAddr, Word) bram <- mkBRAM1Server(cfg);
     MemInitIfc memInit <- mkMemInitBRAM(bram);
 
     Vector#(NRegs, Ehr#(4, Word)) regFile <- replicateM(mkEhr(0));
@@ -41,7 +43,7 @@ module mkAGCMemory(AGCMemory);
     // HACK: Write ports need to be first to keep pipeline FIFO's happy, and we know
     // iMemWrapper is never going to be used to write except for writeZImm,
     MemAndRegWrapper iMemWrapper <- mkMemAndRegWrapper(bram.portA, regFile, 1, 0, 0, 0);
-    MemAndRegWrapper dMemWrapper <- mkMemAndRegWrapper(bram.portB, regFile, 3, 1 /*not actually used*/, 1, 2);
+    MemAndRegWrapper dMemWrapper <- mkMemAndRegWrapper(bram.portA, regFile, 3, 1 /*not actually used*/, 1, 2);
 
     // Convert an AGC4 12-bit memory address to either a register
     // number or a 16-bit internal MemAddr;

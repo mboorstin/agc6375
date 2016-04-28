@@ -16,20 +16,19 @@ module mkAGCIO(DMemoryFetcher fetcher, DMemoryStorer storer, MemInitIfc init, AG
     // Note that we use the same convention as main memory: bottom bit is parity.
     // This is initialized by the testbench.
     BRAM_Configure cfg = defaultValue;
-    BRAM2Port#(IOChannel, Word) ioBuffer <- mkBRAM2Server(cfg);
+    BRAM1Port#(IOChannel, Word) ioBuffer <- mkBRAM1Server(cfg);
 
     // It's important to use a bypass FIFO here so requests
     // can go out ASAP
     // TODO: Might want to increase the size of this if SceMI turns
     // out to be really slow.
-    Fifo#(2, IOPacket) agcToHostQ <- mkBypassFifo;
+    Fifo#(2, IOPacket) agcToHostQ <- mkPipelineFifo();
 
     // There's almost certainly some way of interrogating the modules concerned
     // to see if they have responses, but this seems cleaner
     Reg#(Bool) respFromFetcher <- mkReg(False);
 
     interface HostIO hostIO;
-        // Maybe guard here?  Change it to a Pipeline FIFO?
         method ActionValue#(IOPacket) agcToHost if (init.done);
             agcToHostQ.deq();
             return agcToHostQ.first();
@@ -57,7 +56,7 @@ module mkAGCIO(DMemoryFetcher fetcher, DMemoryStorer storer, MemInitIfc init, AG
             if (lOrQ) begin
                 fetcher.memReq(zeroExtend(channel));
             end else begin
-                ioBuffer.portB.request.put(BRAMRequest{
+                ioBuffer.portA.request.put(BRAMRequest{
                     write: False,
                     responseOnWrite: False,
                     address: channel,
@@ -67,7 +66,7 @@ module mkAGCIO(DMemoryFetcher fetcher, DMemoryStorer storer, MemInitIfc init, AG
         endmethod
 
         method ActionValue#(Word) readResp() if (init.done);
-            Word ret <- respFromFetcher ? fetcher.memResp() : ioBuffer.portB.response.get();
+            Word ret <- respFromFetcher ? fetcher.memResp() : ioBuffer.portA.response.get();
             return ret;
         endmethod
 
@@ -77,7 +76,7 @@ module mkAGCIO(DMemoryFetcher fetcher, DMemoryStorer storer, MemInitIfc init, AG
                 storer.memStore(zeroExtend(channel), data);
             end else begin
                 agcToHostQ.enq(IOPacket{channel: channel, data: {1'b0, data[15:1]}});
-                ioBuffer.portB.request.put(BRAMRequest{
+                ioBuffer.portA.request.put(BRAMRequest{
                     write: True,
                     responseOnWrite: False,
                     address: channel,

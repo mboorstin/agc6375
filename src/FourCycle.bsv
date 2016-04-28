@@ -312,9 +312,8 @@ module mkAGC(AGC);
     // Need guards so can't just do interface HostIO hostIO = io
     interface HostIOWithInit hostIO;
         interface HostIO hostIO;
-            method ActionValue#(IOPacket) agcToHost if (memory.init.done);
+            method ActionValue#(IOPacket) agcToHost if ((stage != Init) && memory.init.done);
                 IOPacket ret <- io.hostIO.agcToHost();
-                $display("IO AGC to Host: ", ret);
                 return ret;
             endmethod
 

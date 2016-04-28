@@ -1,6 +1,6 @@
 # Copyright 2004 Ronald S. Burkey <info@sandroid.org>
-#  
-# This file is part of yaAGC. 
+#
+# This file is part of yaAGC.
 #
 # yaAGC is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,17 +17,17 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 # Filename:	ValidateSmally.agc
-# Purpose:	This is the part of the Validation program, written to 
+# Purpose:	This is the part of the Validation program, written to
 #		correspond as best I can to the flowcharts in the Appendix
 #		of E-2065, which is a document titled "Block II AGC
 #		Self-Check and Show-Banksum", by Edwin D. Smally.
 # Mod history:	07/07/04 RSB.	Began.
 #
 # Similar code was apparently originally in Luminary and/or Colossus,
-# but much of it was removed over the course of time to make more room.  
+# but much of it was removed over the course of time to make more room.
 # I don't know what the original code was like, but the flowcharts still
-# exist, so I've rewritten the code from the flowcharts. 
-		
+# exist, so I've rewritten the code from the flowcharts.
+
 		EXTEND
 		DCA	ASMGEN
 		DTCF
@@ -37,9 +37,9 @@ ASMGEN3		2FCADR	SMGEN3
 ASMMP		2FCADR	SMMP
 ASMDV		2FCADR	SMDV
 SMNEXT
-				
+
 		BANK	4
-SMGEN				
+SMGEN
 		INCR	ERRNUM
 		CA	ZEROES
 		TS	ERRSUB
@@ -73,8 +73,12 @@ SMGEN2
 $SmallyIN-OUT1.agc	# ERRSUB==1-3
 $SmallyIN-OUT2.agc	# 4-5
 $SmallyIN-OUT3.agc	# 6-10
+
+
 $SmallyCOUNTCHK.agc	# 11
 $SmallyO-UFLOW.agc	# 12
+
+
 		EXTEND
 		DCA	ASMGEN3
 		DTCF
@@ -85,7 +89,12 @@ SMGEN3
 		CA	ZEROES
 		TS	ERRSUB
 		# ERRNUM==63
-$SmallyCNTRCHK.agc	# ERRSUB==1
+
+
+# $SmallyCNTRCHK.agc	# ERRSUB==1
+		INCR	ERRSUB
+
+
 $SmallyCYCLSHFT.agc	# 2-3
 		EXTEND
 		DCA	ASMMP
@@ -97,7 +106,11 @@ SMMP
 		CA	ZEROES
 		TS	ERRSUB
 		# ERRNUM==64
+
+
 $SmallyMPNMBRS.agc	# ERRSUB=1-4
+
+
 		EXTEND
 		DCA	ASMDV
 		DTCF
@@ -108,9 +121,12 @@ SMDV
 		CA	ZEROES
 		TS	ERRSUB
 		# ERRNUM==65
+
+
 $SmallyDVCHECK.agc	# ERRSUB=1-11
+
 		TCF	SMNEXT
-		
-		
+
+
 		SETLOC	SMNEXT
 

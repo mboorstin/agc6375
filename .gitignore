@@ -4,7 +4,10 @@ out.so
 simOut
 simOut.gz
 simOut.tar.gz
+synthOut*
 *.html
 *.lst
+*.jou
+*.log
 
 !.gitignore

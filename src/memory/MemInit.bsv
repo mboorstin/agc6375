@@ -6,7 +6,7 @@ import BRAM::*;
 import MemTypes::*;
 import Types::*;
 
-module mkMemInitBRAM(BRAM2Port#(MemAddr, Word) mem, MemInitIfc ifc);
+module mkMemInitBRAM(BRAM1Port#(MemAddr, Word) mem, MemInitIfc ifc);
     Reg#(Bool) initialized <- mkReg(False);
 
     interface Put request;
