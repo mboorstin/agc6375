@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstdint>
 #include <sys/socket.h>
 #include <netinet/in.h>
 
@@ -51,7 +52,7 @@ int initMem(char* programPath, InportProxyT<MemInit>* memInit) {
     printf("Starting memory initialization...\n");
 
     // Read one word at a time
-    char readBuf[2];
+    uint8_t readBuf[2];
     MemInit initMessage;
     initMessage.the_tag = MemInit::tag_InitLoad;
 

@@ -42,5 +42,6 @@ build-for:            c++
 c++-header-directory: build/procToDSKYInclude
 c++-header-aliases
 c++-files:            ../procToDSKY.cpp ../ResetXactor.cpp
+c++-options:          -std=c++11
 exe-file:             build/bin/procToDSKY
 

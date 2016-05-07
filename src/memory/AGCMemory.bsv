@@ -30,8 +30,6 @@ module mkAGCMemory(AGCMemory);
     // Load a VMH in simulation so we don't have to transfer it over SceMi
     `ifdef SIM
         cfg.loadFormat = Hex("program.vmh");
-    `else
-        cfg.loadFormat = Hex("/afs/athena.mit.edu/user/b/o/boorstin/6.375_nfs/project/scemi/fpga_vc707/program.vmh");
     `endif
 
     BRAM1Port#(MemAddr, Word) bram <- mkBRAM1Server(cfg);
