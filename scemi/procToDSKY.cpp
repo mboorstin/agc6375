@@ -122,6 +122,7 @@ struct DSKYPacket {
 void dskyPacketToIOPacket(DSKYPacket* in, IOPacket* out) {
     out->m_channel = (in->pUpper << 3) + in->pLower;
     out->m_data = (in->dUpper << 12) + (in->dMiddle << 6) + in->dLower;
+    out->m_u = in->u;
 }
 
 // We're repeatedly setting padding, t, and u unnecessarily.  Should just initialize once.
@@ -168,19 +169,29 @@ void* runDSKYListener(void* arg) {
 
         if (!started) {
             printf("Got connection, starting processor!\n");
+            sleep(5);
             started = true;
             args->start->sendMessage(AGC_START_IP);
         }
 
         printf("B\n");
 
+        int loc = 0;
+
         while (true) {
-            if (read(dskyFD, &inBuf, sizeof(DSKYPacket)) < sizeof(DSKYPacket)) {
+            int bytesRead = read(dskyFD, ((uint8_t*) &inBuf) + loc, sizeof(DSKYPacket) - loc);
+            if (bytesRead <= 0) {
                 fprintf(stderr, "Error reading from socket!\n");
                 close(dskyFD);
                 break;
             }
 
+            loc += bytesRead;
+            if (loc != sizeof(DSKYPacket)) {
+                continue;
+            }
+
+            loc = 0;
             dskyPacketToIOPacket(&inBuf, &outBuf);
             fprintf(stderr, "Received data from yaDSKY2: channel o%o  data 0x%x\n", (unsigned int) outBuf.m_channel, (unsigned int) outBuf.m_data);
             args->ioHostToAGC->sendMessage(outBuf);

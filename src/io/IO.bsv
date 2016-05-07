@@ -1,4 +1,5 @@
 import BRAM::*;
+import Vector::*;
 
 import Fifo::*;
 import InterStage::*;
@@ -15,8 +16,9 @@ module mkAGCIO(DMemoryFetcher fetcher, DMemoryStorer storer, MemInitIfc init, AG
     // wires that the AGC can read from at will
     // Note that we use the same convention as main memory: bottom bit is parity.
     // This is initialized by the testbench.
-    BRAM_Configure cfg = defaultValue;
-    BRAM1Port#(IOChannel, Word) ioBuffer <- mkBRAM1Server(cfg);
+
+    Vector#(NIOChannels, Reg#(Word)) ioBuffer <- replicateM(mkReg(0));
+    Vector#(NIOChannels, Reg#(IOMask)) ioMasks <- replicateM(mkReg(15'h7FFF));
 
     // It's important to use a bypass FIFO here so requests
     // can go out ASAP
@@ -24,9 +26,7 @@ module mkAGCIO(DMemoryFetcher fetcher, DMemoryStorer storer, MemInitIfc init, AG
     // out to be really slow.
     Fifo#(2, IOPacket) agcToHostQ <- mkPipelineFifo();
 
-    // There's almost certainly some way of interrogating the modules concerned
-    // to see if they have responses, but this seems cleaner
-    Reg#(Bool) respFromFetcher <- mkReg(False);
+    Fifo#(2, Word) ioDelayed <- mkCFFifo();
 
     interface HostIO hostIO;
         method ActionValue#(IOPacket) agcToHost if (init.done);
@@ -40,33 +40,33 @@ module mkAGCIO(DMemoryFetcher fetcher, DMemoryStorer storer, MemInitIfc init, AG
         // We don't need to worry about rL and rQ here because they're not
         // I/O channels so external things aren't allowed to write to them
         method Action hostToAGC(IOPacket packet);
-            ioBuffer.portA.request.put(BRAMRequest{
-                write: True,
-                responseOnWrite: False,
-                address: packet.channel,
-                datain: {packet.data[14:0], 1'b0}
-            });
+            if (packet.u) begin
+                ioMasks[packet.channel] <= packet.data[14:0];
+            end else begin
+                IOMask newVal = (ioBuffer[packet.channel][15:1] & ~ioMasks[packet.channel]) | packet.data[14:0];
+                ioBuffer[packet.channel] <= {newVal, 1'b0};
+            end
         endmethod
     endinterface
 
     interface InternalIO internalIO;
         method Action readReq(IOChannel channel) if (init.done);
             Bool lOrQ = is16BitChannel(channel);
-            respFromFetcher <= lOrQ;
             if (lOrQ) begin
                 fetcher.memReq(zeroExtend(channel));
             end else begin
-                ioBuffer.portA.request.put(BRAMRequest{
-                    write: False,
-                    responseOnWrite: False,
-                    address: channel,
-                    datain: ?
-                });
+                ioDelayed.enq(ioBuffer[channel]);
             end
         endmethod
 
         method ActionValue#(Word) readResp() if (init.done);
-            Word ret <- respFromFetcher ? fetcher.memResp() : ioBuffer.portA.response.get();
+            Word ret;
+            if (ioDelayed.notEmpty) begin
+                ret = ioDelayed.first();
+                ioDelayed.deq();
+            end else begin
+                ret <- fetcher.memResp();
+            end
             return ret;
         endmethod
 
@@ -75,13 +75,8 @@ module mkAGCIO(DMemoryFetcher fetcher, DMemoryStorer storer, MemInitIfc init, AG
             if (lOrQ) begin
                 storer.memStore(zeroExtend(channel), data);
             end else begin
-                agcToHostQ.enq(IOPacket{channel: channel, data: {1'b0, data[15:1]}});
-                ioBuffer.portA.request.put(BRAMRequest{
-                    write: True,
-                    responseOnWrite: False,
-                    address: channel,
-                    datain: data
-                });
+                agcToHostQ.enq(IOPacket{channel: channel, data: {1'b0, data[15:1]}, u: False});
+                ioBuffer[channel] <= data;
             end
         endmethod
     endinterface

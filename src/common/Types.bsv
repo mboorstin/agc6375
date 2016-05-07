@@ -11,12 +11,16 @@ typedef 32 DoubleWordSz;
 typedef Bit#(DoubleWordSz) DoubleWord;
 
 typedef 7 IOChannelSize;
+typedef TExp#(IOChannelSize) NIOChannels;
 typedef Bit#(IOChannelSize) IOChannel;
 
 typedef struct {
     IOChannel channel;
     Word data;
+    Bool u;
 } IOPacket deriving (Eq, Bits, FShow);
+
+typedef Bit#(15) IOMask;
 
 // Annoyingly all of the MemInit stuff has to be here so that it can
 // be used in interface AGC
