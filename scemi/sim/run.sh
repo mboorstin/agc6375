@@ -10,7 +10,8 @@ fi
 source /mit/6.375/setup.sh
 # Bluesim needs to be run from the same directory as program.vmh...sigh
 cd build/bin
-./${1}Sim | gzip > ../../simOut.gz &
+# ./${1}Sim | gzip > ../../simOut.gz &
+./${1}Sim > ../../simOut &
 sleep .5
 ./procToDSKY
 cd -

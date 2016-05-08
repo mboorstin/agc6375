@@ -143,6 +143,7 @@ function DecodeRes decode(Instruction inst, Bool isExtended);
                     qcINDEX: begin //INDEX
                         return dINDEXBasic(inst);
                     end
+
                     qcDXCH: begin //DXCH
                         return dDXCH(inst);
                     end
@@ -317,7 +318,6 @@ function DecodeRes dINDEXExtended(Instruction inst);
     };
 endfunction
 
-// For now, completely ignoring interrupts
 function DecodeRes dINHINT();
     return DecodeRes {
         memAddrOrIOChannel: tagged None,
@@ -350,7 +350,6 @@ function DecodeRes dMSU(Instruction inst);
     };
 endfunction
 
-// For now, completely ignoring interrupts
 function DecodeRes dRELINT();
     return DecodeRes {
         memAddrOrIOChannel: tagged None,

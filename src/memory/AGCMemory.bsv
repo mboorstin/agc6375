@@ -128,6 +128,18 @@ module mkAGCMemory(AGCMemory);
             Instruction ret <- dMemWrapper.regResp();
             return ret;
         endmethod
+
+        method Bool hasOverflows() if (memInit.done);
+            return dMemWrapper.hasOverflows();
+        endmethod
+
+        method Word readRegImm(RegIdx idx) if (memInit.done);
+            return dMemWrapper.readRegImm(idx);
+        endmethod
+
+        method Addr getZRUPT() if (memInit.done);
+            return dMemWrapper.getZRUPT();
+        endmethod
     endinterface
 
     interface DMemoryStorer storer;
@@ -142,6 +154,7 @@ module mkAGCMemory(AGCMemory);
 
     interface SuperbankProvider superbank;
         method Action set(Word data) if (memInit.done);
+            $display("Setting the superbank to %s", (data[7] == 1) ? "true" : "false");
             superbankBit <= (data[7] == 1);
         endmethod
 

@@ -19,6 +19,10 @@ interface DMemoryFetcher;
 
     method ActionValue#(Word) memResp();
     method ActionValue#(Word) regResp();
+
+    method Word readRegImm(RegIdx idx);
+    method Bool hasOverflows();
+    method Addr getZRUPT();
 endinterface
 
 // A memory suitable for storing AGC data.  Similarly to above,
