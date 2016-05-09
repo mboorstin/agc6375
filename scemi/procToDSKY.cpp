@@ -169,7 +169,7 @@ void* runDSKYListener(void* arg) {
 
         if (!started) {
             printf("Got connection, starting processor!\n");
-            sleep(5);
+            sleep(2);
             started = true;
             args->start->sendMessage(AGC_START_IP);
         }

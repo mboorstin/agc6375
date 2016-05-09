@@ -95,9 +95,15 @@ module mkAGC(AGC);
         Bool hasOverflows = memory.fetcher.hasOverflows();
         Maybe#(Addr) isrAddr = tagged Invalid;
 
-        if (!inISR && !hasOverflows && !isExtended && interruptsEnabled && !isValid(indexAddend)) begin
+        if (!inISR && !hasOverflows && !isExtended && interruptsEnabled && !isValid(indexAddend) && (last.z != 'O4000) && (last.z != 'O4001)) begin
 
-            if (dskyInterrupt) begin
+            if (memory.timers.t3IRUPT) begin
+                isrAddr = tagged Valid 'O4015;
+                memory.timers.clearT3IRUPT();
+            end else if (memory.timers.t4IRUPT) begin
+                isrAddr = tagged Valid 'O4021;
+                memory.timers.clearT4IRUPT();
+            end else if (dskyInterrupt) begin
                 isrAddr = tagged Valid 'O4025;
                 dskyInterrupt <= False;
             end
