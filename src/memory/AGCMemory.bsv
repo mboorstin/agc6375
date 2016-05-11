@@ -39,8 +39,7 @@ module mkAGCMemory(AGCMemory);
     Vector#(NRegs, Ehr#(5, Word)) regFile <- replicateM(mkEhr(0));
     Reg#(Bool) superbankBit <- mkReg(False);
 
-    // CHANGE FOR SYNTHESIS!
-    Reg#(Bit#(12)) masterTimer <- mkReg(0);
+    Reg#(Bit#(19)) masterTimer <- mkReg(0);
     Reg#(Bool) t3IRUPT <- mkReg(False);
     Reg#(Bool) t4IRUPT <- mkReg(False);
 
@@ -50,9 +49,12 @@ module mkAGCMemory(AGCMemory);
     MemAndRegWrapper dMemWrapper <- mkMemAndRegWrapper(bram.portA, regFile, 3, 1 /*not actually used*/, 1, 2);
 
     rule tick(memInit.done);
-        // CHANGE FOR SYNTHESIS!
-        Bit#(12) newTime = masterTimer + 1;
-        if (newTime == 79) begin
+        Bit#(19) newTime = masterTimer + 1;
+        `ifdef SIM
+            if (newTime == 79) begin
+        `else
+            if (newTime == 250000) begin
+        `endif
             Bit#(15) newVal = addOnesUncorrected(regFile[rTIME3][4][15:1], zeroExtend(1'b1));
             // Ie, overflowed into negatives
             if (newVal == {1'b1, 0}) begin
@@ -60,7 +62,11 @@ module mkAGCMemory(AGCMemory);
                 newVal = 0;
             end
             regFile[rTIME3][4] <= {newVal, 1'b0};
-        end else if (newTime == 158) begin
+        `ifdef SIM
+            end else if (newTime == 158) begin
+        `else
+            end else if (newTime == 500000) begin
+        `endif
             Bit#(15) newVal = addOnesUncorrected(regFile[rTIME4][4][15:1], zeroExtend(1'b1));
             // Ie, overflowed into negatives
             if (newVal == {1'b1, 0}) begin
