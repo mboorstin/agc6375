@@ -24,7 +24,7 @@ typedef enum {
 module mkAGC(AGC);
     // General state
     AGCMemory memory <- mkAGCMemory();
-    AGCIO io <- mkAGCIO(memory.fetcher, memory.storer, memory.init);
+    AGCIO io <- mkAGCIO(memory.fetcher, memory.storer, memory.superbank, memory.init);
 
     // Stage management
     Reg#(Stage) stage <- mkReg(Init);
@@ -41,17 +41,18 @@ module mkAGC(AGC);
     // Divide handling
     Divider divider <- mkDivider();
 
-    function Instruction handleIndex(Instruction inst);
-        if (isValid(indexAddend)) begin
-            // We basically need to treat inst as unsigned and indexAddend as signed.
-            // This presumes INDEX ignores overflow - it's not actually specified as such but seems the most reasonable option.
-            Bit#(15) topBitZerod = addOnesUncorrected({1'b0, inst[14:1]}, fromMaybe(?, indexAddend)[15:1]);
-            Bit#(1) topBit = inst[15] ^ topBitZerod[14];
-            return {topBit, topBitZerod[13:0], 1'b0};
+    // Interrupt status
+    Reg#(Bool) inISR <- mkReg(False);
+    Reg#(Bool) interruptsEnabled <- mkReg(True);
 
-        end else begin
-            return inst;
-        end
+    Reg#(Bool) dskyInterrupt <- mkReg(False);
+
+    function Instruction handleIndex(Instruction inst);
+        // We basically need to treat inst as unsigned and indexAddend as signed.
+        // This presumes INDEX ignores overflow - it's not actually specified as such but seems the most reasonable option.
+        Bit#(15) topBitZerod = addOnesUncorrected({1'b0, inst[14:1]}, fromMaybe(?, indexAddend)[15:1]);
+        Bit#(1) topBit = inst[15] ^ topBitZerod[14];
+        return {topBit, topBitZerod[13:0], 1'b0};
     endfunction
 
     rule fetch((stage == Fetch) && memory.init.done);
@@ -86,63 +87,107 @@ module mkAGC(AGC);
         // Get the instruction from memory
         Instruction inst <- memory.imem.resp();
 
-        // Add the index to it if necessary
-        if (isValid(indexAddend)) begin
-            $display("indexAddend is valid: instruction = 0x%x, indexAddend = 0x%x", inst[15:1], fromMaybe(?, indexAddend));
-        end
-        inst = handleIndex(inst);
-        if (isValid(indexAddend)) begin
-            $display("New instruction: 0x%x", inst);
+        if ((last.z == 1) || (last.z == 2) || (last.z == 3)) begin
+            inst = {overflowCorrect(inst), 1'b0};
         end
 
-        // Do the decode
-        DecodeRes decoded = decode(inst, isExtended);
+        // Handle interrupts
+        Bool hasOverflows = memory.fetcher.hasOverflows();
+        Maybe#(Addr) isrAddr = tagged Invalid;
 
-        $display("Decoded instruction: ", fshow(decoded.instNum));
-        if (decoded.instNum == UNIMPLEMENTED) begin
-            $finish();
+        if (!inISR && !hasOverflows && !isExtended && interruptsEnabled && !isValid(indexAddend) && (last.z != 'O4000) && (last.z != 'O4001)) begin
+
+            if (memory.timers.t3IRUPT) begin
+                isrAddr = tagged Valid 'O4015;
+                memory.timers.clearT3IRUPT();
+            end else if (memory.timers.t4IRUPT) begin
+                isrAddr = tagged Valid 'O4021;
+                memory.timers.clearT4IRUPT();
+            end else if (dskyInterrupt) begin
+                isrAddr = tagged Valid 'O4025;
+                dskyInterrupt <= False;
+            end
         end
 
-        // Do the memory and IO requests
-        if (decoded.memAddrOrIOChannel matches tagged Addr .addr) begin
-           $display("Requesting data load: o%o", addr);
-           memory.fetcher.memReq(addr);
-        end else if (decoded.memAddrOrIOChannel matches tagged IOChannel .channel) begin
-            io.internalIO.readReq(channel);
-        end
-
-        if (isValid(decoded.regNum)) begin
-            memory.fetcher.regReq(fromMaybe(?, decoded.regNum));
-        end
-
-        // Set state flags if necessary
-        if (decoded.instNum == EXTEND) begin
-            isExtended <= True;
-        end else if (decoded.instNum != INDEX) begin
-            isExtended <= False;
-        end
-
-        Decode2Exec d2eArgs = Decode2Exec{
-            z: last.z,
-            inst: inst,
-            decoded: decoded,
-            fromMemForDouble: ?,
-            fromRegForDouble: ?
-        };
-
-        // Set the new stage
-        if (isDoubleRead(decoded.instNum)) begin
-            d2dd.enq(d2eArgs);
-            stage <= DecodeDouble;
+        if (isValid(isrAddr)) begin
+            e2w.enq(Exec2Writeback{
+                eRes1: {?, 3'b0, last.z, 1'b0},
+                eRes2: {?, inst},
+                memAddrOrIOChannel: tagged Addr zeroExtend(rZRUPT),
+                regNum: tagged Valid rBRUPT,
+                newZ: isrAddr.Valid
+            });
+            inISR <= True;
+            stage <= Writeback;
         end else begin
-            // Notify execute
-            d2e.enq(d2eArgs);
+            // Add the index to it if necessary
+            if (isValid(indexAddend)) begin
+                $display("indexAddend is valid: instruction = 0x%x, indexAddend = 0x%x", inst[15:1], fromMaybe(?, indexAddend));
+                inst = handleIndex(inst);
+            // RESUME
+            end else if (inst[15:1] == 'O50017) begin
+                inst = memory.fetcher.readRegImm(rBRUPT);
+                last.z = memory.fetcher.getZRUPT();
+                inISR <= False;
+            end
+            if (isValid(indexAddend)) begin
+                $display("New instruction: 0x%x", inst);
+            end
 
-            if (decoded.instNum == EDRUPT) begin
-                $display("Got EDRUPT!");
-                stage <= Finished;
+            // Do the decode
+            DecodeRes decoded = decode(inst, isExtended);
+
+            $display("Decoded instruction: ", fshow(decoded.instNum));
+
+            // Do the memory and IO requests
+            if (decoded.memAddrOrIOChannel matches tagged Addr .addr) begin
+               $display("Requesting data load: o%o", addr);
+               memory.fetcher.memReq(addr);
+            end else if (decoded.memAddrOrIOChannel matches tagged IOChannel .channel) begin
+                io.internalIO.readReq(channel);
+            end
+
+            if (isValid(decoded.regNum)) begin
+                memory.fetcher.regReq(fromMaybe(?, decoded.regNum));
+            end
+
+            // Set state flags if necessary
+            if (decoded.instNum == EXTEND) begin
+                isExtended <= True;
+            end else if (decoded.instNum != INDEX) begin
+                isExtended <= False;
+            end
+
+            if (decoded.instNum == INHINT) begin
+                interruptsEnabled <= False;
+            end else if (decoded.instNum == RELINT) begin
+                interruptsEnabled <= True;
+            end else if (decoded.instNum == UNIMPLEMENTED) begin
+                $finish();
+            end
+
+            Decode2Exec d2eArgs = Decode2Exec{
+                z: last.z,
+                inst: inst,
+                decoded: decoded,
+                fromMemForDouble: ?,
+                fromRegForDouble: ?
+            };
+
+            // Set the new stage
+            if (isDoubleRead(decoded.instNum)) begin
+                d2dd.enq(d2eArgs);
+                stage <= DecodeDouble;
             end else begin
-                stage <= Exec;
+                // Notify execute
+                d2e.enq(d2eArgs);
+
+                if (decoded.instNum == EDRUPT) begin
+                    $display("Got EDRUPT!");
+                    stage <= Finished;
+                end else begin
+                    stage <= Exec;
+                end
             end
         end
 
@@ -319,6 +364,9 @@ module mkAGC(AGC);
 
             method Action hostToAGC(IOPacket packet) if ((stage != Init) && memory.init.done);
                 $display("IO Host to AGC: ", packet);
+                if ((packet.channel == 13) || (packet.channel == 26)) begin
+                    dskyInterrupt <= True;
+                end
                 io.hostIO.hostToAGC(packet);
             endmethod
         endinterface

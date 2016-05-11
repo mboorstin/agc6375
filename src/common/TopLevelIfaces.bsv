@@ -19,6 +19,10 @@ interface DMemoryFetcher;
 
     method ActionValue#(Word) memResp();
     method ActionValue#(Word) regResp();
+
+    method Word readRegImm(RegIdx idx);
+    method Bool hasOverflows();
+    method Addr getZRUPT();
 endinterface
 
 // A memory suitable for storing AGC data.  Similarly to above,
@@ -35,11 +39,20 @@ interface SuperbankProvider;
     method Word get();
 endinterface
 
+// An interface for handling timers
+interface TimerProvider;
+    method Bool t3IRUPT();
+    method Action clearT3IRUPT();
+    method Bool t4IRUPT();
+    method Action clearT4IRUPT();
+endinterface
+
 interface AGCMemory;
     interface IMemory imem;
     interface DMemoryFetcher fetcher;
     interface DMemoryStorer storer;
     interface SuperbankProvider superbank;
+    interface TimerProvider timers;
     interface MemInitIfc init;
 endinterface
 

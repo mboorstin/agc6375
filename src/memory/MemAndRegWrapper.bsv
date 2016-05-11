@@ -86,6 +86,17 @@ module mkMemAndRegWrapper(BRAMServer#(MemAddr, Word) bramPort, Vector#(NRegs, Eh
         return getReg(idx, readIdx);
     endmethod
 
+    method Bool hasOverflows();
+        Word a = getReg(rA, readIdx);
+        Word l = getReg(rL, readIdx);
+        Word q = getReg(rQ, readIdx);
+        return (a[15] != a[14]) || (l[15] != l[14]) || (q[15] != q[14]);
+    endmethod
+
+    method Addr getZRUPT();
+        return getReg(rZRUPT, readIdx)[12:1];
+    endmethod
+
     method ActionValue#(Word) memResp();
         if (memDelayed.notEmpty) begin
             $display("memResp: from reg");

@@ -17,6 +17,8 @@ interface MemAndRegWrapper;
     method Action readMem(RealMemAddr addr);
     method Action readReg(RegIdx idx);
     method Word readRegImm(RegIdx idx);
+    method Bool hasOverflows();
+    method Addr getZRUPT();
 
     method ActionValue#(Word) memResp();
     method ActionValue#(Word) regResp();

@@ -1,0 +1,197 @@
+# Every second, toggle the COMP ACTY light (11, bit 2)
+
+# Registers
+A	EQUALS	0
+TIME4	EQUALS	27
+
+# I/O Channels
+PYJETS	EQUALS	5
+ROLLJETS	EQUALS	6
+
+PITCHCTRL	EQUALS	166
+YAWCTRL	EQUALS	167
+ROLLCTRL	EQUALS	170
+
+
+		# Program
+		SETLOC	4000
+		INHINT
+		TCF	STARTUP
+
+		# Counter 3
+		SETLOC	4014
+		RESUME
+
+		# Counter 4
+		SETLOC	4020
+		TCF	TRUPT4
+
+		# DSKY
+		SETLOC	4024
+		RESUME
+
+
+		SETLOC	4100
+STARTUP
+		CA	ALLOFF
+		EXTEND
+		WRITE	PYJETS
+		CA	ONESECOND
+		TS	TIME4
+		RELINT
+SPIN
+		TCF	SPIN
+
+
+
+TRUPT4
+		CA	ONESECOND
+		TS	TIME4
+
+		# Yaw is easy: read YAWCTRL and fire a single ROLLJET
+		EXTEND
+		READ	YAWCTRL
+		CCS	A
+		TCF	YAWPOS
+		TCF	YAWNEUT
+		TCF	YAWNEG
+		TCF	YAWNEUT
+YAWPOS
+		# Quad 3 A
+		CA	BIT1
+		TCF	WRTROLLJET
+YAWNEUT
+		CA	ALLOFF
+		TCF	WRTROLLJET
+YAWNEG
+		# Quad 4 F
+		CA	BIT2
+		TCF	WRTROLLJET
+WRTROLLJET
+		EXTEND
+		WRITE	ROLLJETS
+
+
+		# Roll and pitch are less easy because they conflict with each other.
+		# Could probably do this with index but a CCS / TCF tree is clearer
+		# Basically, just read roll, then do individual logic for each option
+		EXTEND
+		READ	ROLLCTRL
+		CCS	A
+		TCF	ROLLPOS
+		TCF	ROLLNEUT
+		TCF	ROLLNEG
+		TCF	ROLLNEUT
+
+		# Roll Positive
+ROLLPOS
+		EXTEND
+		READ	PITCHCTRL
+		CCS	A
+		# yaYUL gave cryptic errors when I tried using reasonable names
+		# like "ROLLPOSPITCHPOS".  Oh well.
+		TCF	RPPP
+		TCF	RPPE
+		TCF	RPPN
+		TCF	RPPE
+
+		# Roll neutral
+ROLLNEUT
+		EXTEND
+		READ	PITCHCTRL
+		CCS	A
+		TCF	REPP
+		TCF	REPE
+		TCF	REPN
+		TCF	REPE
+
+		# Roll negative
+ROLLNEG
+		EXTEND
+		READ	PITCHCTRL
+		CCS	A
+		TCF	RNPP
+		TCF	RNPE
+		TCF	RNPN
+		TCF	RNPE
+
+RPPP
+		CA	BIT1
+		TCF	WRTPYJET
+RPPE
+		CA	BIT1AND3
+		TCF	WRTPYJET
+RPPN
+		CA	BIT3
+		TCF	WRTPYJET
+
+REPP
+		CA	BIT1AND4
+		TCF	WRTPYJET
+REPE
+		CA	ALLOFF
+		TCF	WRTPYJET
+REPN
+		CA	BIT2AND3
+		TCF	WRTPYJET
+
+RNPP
+		CA	BIT4
+		TCF	WRTPYJET
+RNPE
+		CA	BIT2AND4
+		TCF	WRTPYJET
+RNPN
+		CA	BIT2
+		TCF	WRTPYJET
+
+
+WRTPYJET
+		EXTEND
+		WRITE	PYJETS
+
+		RESUME
+
+
+
+
+		# Data
+		SETLOC	4400
+ONESECOND
+		OCT	37634
+HALFSECOND
+		OCT	17716
+QRTSECOND
+		OCT	7747
+
+		# Oh how I miss having constants
+ALLOFF
+		OCT	0
+
+		# Following AGC conventions for 1-indexing
+BIT1
+		OCT	1
+BIT2
+		OCT	2
+BIT3
+		OCT	4
+BIT4
+		OCT	10
+BIT5
+		OCT	20
+BIT6
+		OCT	40
+BIT7
+		OCT	100
+BIT8
+		OCT	200
+
+
+BIT1AND3
+		OCT	5
+BIT1AND4
+		OCT	11
+BIT2AND3
+		OCT	6
+BIT2AND4
+		OCT	12

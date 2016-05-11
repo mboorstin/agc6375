@@ -1,6 +1,7 @@
 import BRAM::*;
 import Vector::*;
 
+import ArithUtil::*;
 import TopLevelIfaces::*;
 import Ehr::*;
 import Fifo::*;
@@ -35,13 +36,44 @@ module mkAGCMemory(AGCMemory);
     BRAM1Port#(MemAddr, Word) bram <- mkBRAM1Server(cfg);
     MemInitIfc memInit <- mkMemInitBRAM(bram);
 
-    Vector#(NRegs, Ehr#(4, Word)) regFile <- replicateM(mkEhr(0));
+    Vector#(NRegs, Ehr#(5, Word)) regFile <- replicateM(mkEhr(0));
     Reg#(Bool) superbankBit <- mkReg(False);
+
+    // CHANGE FOR SYNTHESIS!
+    Reg#(Bit#(12)) masterTimer <- mkReg(0);
+    Reg#(Bool) t3IRUPT <- mkReg(False);
+    Reg#(Bool) t4IRUPT <- mkReg(False);
 
     // HACK: Write ports need to be first to keep pipeline FIFO's happy, and we know
     // iMemWrapper is never going to be used to write except for writeZImm,
     MemAndRegWrapper iMemWrapper <- mkMemAndRegWrapper(bram.portA, regFile, 1, 0, 0, 0);
     MemAndRegWrapper dMemWrapper <- mkMemAndRegWrapper(bram.portA, regFile, 3, 1 /*not actually used*/, 1, 2);
+
+    rule tick(memInit.done);
+        // CHANGE FOR SYNTHESIS!
+        Bit#(12) newTime = masterTimer + 1;
+        if (newTime == 79) begin
+            Bit#(15) newVal = addOnesUncorrected(regFile[rTIME3][4][15:1], zeroExtend(1'b1));
+            // Ie, overflowed into negatives
+            if (newVal == {1'b1, 0}) begin
+                t3IRUPT <= True;
+                newVal = 0;
+            end
+            regFile[rTIME3][4] <= {newVal, 1'b0};
+        end else if (newTime == 158) begin
+            Bit#(15) newVal = addOnesUncorrected(regFile[rTIME4][4][15:1], zeroExtend(1'b1));
+            // Ie, overflowed into negatives
+            if (newVal == {1'b1, 0}) begin
+                t4IRUPT <= True;
+                newVal = 0;
+            end
+            regFile[rTIME4][4] <= {newVal, 1'b0};
+
+            newTime = 0;
+        end
+
+        masterTimer <= newTime;
+    endrule
 
     // Convert an AGC4 12-bit memory address to either a register
     // number or a 16-bit internal MemAddr;
@@ -128,6 +160,18 @@ module mkAGCMemory(AGCMemory);
             Instruction ret <- dMemWrapper.regResp();
             return ret;
         endmethod
+
+        method Bool hasOverflows() if (memInit.done);
+            return dMemWrapper.hasOverflows();
+        endmethod
+
+        method Word readRegImm(RegIdx idx) if (memInit.done);
+            return dMemWrapper.readRegImm(idx);
+        endmethod
+
+        method Addr getZRUPT() if (memInit.done);
+            return dMemWrapper.getZRUPT();
+        endmethod
     endinterface
 
     interface DMemoryStorer storer;
@@ -142,11 +186,30 @@ module mkAGCMemory(AGCMemory);
 
     interface SuperbankProvider superbank;
         method Action set(Word data) if (memInit.done);
+            $display("Setting the superbank to %s", (data[7] == 1) ? "true" : "false");
             superbankBit <= (data[7] == 1);
         endmethod
 
         method Word get() if (memInit.done);
             return {0, superbankBit ? 1'b1 : 1'b0, 7'b0};
+        endmethod
+    endinterface
+
+    interface TimerProvider timers;
+        method Bool t3IRUPT() if (memInit.done);
+            return t3IRUPT;
+        endmethod
+
+        method Action clearT3IRUPT() if (memInit.done);
+            t3IRUPT <= False;
+        endmethod
+
+        method Bool t4IRUPT() if (memInit.done);
+            return t4IRUPT;
+        endmethod
+
+        method Action clearT4IRUPT() if (memInit.done);
+            t4IRUPT <= False;
         endmethod
     endinterface
 

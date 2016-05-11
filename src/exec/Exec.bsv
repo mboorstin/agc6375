@@ -488,6 +488,10 @@ function Exec2Writeback dxch(ExecFuncArgs args);
 
     Bool isA = (memAddr == zeroExtend(rA));
 
+    if (memAddr == zeroExtend(rZ)) begin
+        kVal = kVal + 2;
+    end
+
     return Exec2Writeback {
         eRes1: {kp1Val, kVal},
         eRes2: {lVal, aVal},

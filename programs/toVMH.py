@@ -24,6 +24,11 @@ with open(inFilePath, "rb") as inFile:
             word = (ord(upper) << 8) + ord(lower)
             outFile.write(format(word, "x") + "\n")
 
+        # Erasable - all to 0???
+        outFile.write("@0\n")
+        for i in xrange(2048):
+            outFile.write("0\n")
+
         # Bank 2: 4096
         outFile.write("@1000\n")
         # Banks 2, 3

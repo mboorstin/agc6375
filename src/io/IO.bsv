@@ -10,7 +10,7 @@ import Types::*;
 // get/set rL and rQ here, because they're the only ones we're guaranteed to not have
 // a conflict with (because we can never request IO and memory in the same instruction)
 
-module mkAGCIO(DMemoryFetcher fetcher, DMemoryStorer storer, MemInitIfc init, AGCIO ifc);
+module mkAGCIO(DMemoryFetcher fetcher, DMemoryStorer storer, SuperbankProvider superbank, MemInitIfc init, AGCIO ifc);
     // We use a 128 word BRAM to buffer the state of the IO
     // channels, since we obviously can't have a bunch of physical
     // wires that the AGC can read from at will
@@ -54,6 +54,8 @@ module mkAGCIO(DMemoryFetcher fetcher, DMemoryStorer storer, MemInitIfc init, AG
             Bool lOrQ = is16BitChannel(channel);
             if (lOrQ) begin
                 fetcher.memReq(zeroExtend(channel));
+            end else if (channel == 7) begin
+                ioDelayed.enq(superbank.get());
             end else begin
                 ioDelayed.enq(ioBuffer[channel]);
             end
@@ -74,6 +76,8 @@ module mkAGCIO(DMemoryFetcher fetcher, DMemoryStorer storer, MemInitIfc init, AG
             Bool lOrQ = is16BitChannel(channel);
             if (lOrQ) begin
                 storer.memStore(zeroExtend(channel), data);
+            end else if (channel == 7) begin
+                superbank.set(data);
             end else begin
                 agcToHostQ.enq(IOPacket{channel: channel, data: {1'b0, data[15:1]}, u: False});
                 ioBuffer[channel] <= data;
