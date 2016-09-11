@@ -28,6 +28,9 @@ module mkAGCIO(DMemoryFetcher fetcher, DMemoryStorer storer, SuperbankProvider s
 
     Fifo#(2, Word) ioDelayed <- mkCFFifo();
 
+    // Timer for downlink
+    Reg#(Bit#(20)) downlinkTimer <- mkReg(0);
+
     interface HostIO hostIO;
         method ActionValue#(IOPacket) agcToHost if (init.done);
             agcToHostQ.deq();
@@ -79,9 +82,35 @@ module mkAGCIO(DMemoryFetcher fetcher, DMemoryStorer storer, SuperbankProvider s
             end else if (channel == 7) begin
                 superbank.set(data);
             end else begin
+                // Octal 35: Downlink
+                // Problems: if are only ticking on writeback should divide this by 4
+                // Also use ~ rather than hardcoded
+                // Also holy god is this bad
+                if (channel == 29) begin
+                    `ifdef SIM
+                        downlinkTimer <= 316;
+                    `else
+                        downlinkTimer <= 1000000;
+                    `endif
+                end
+
                 agcToHostQ.enq(IOPacket{channel: channel, data: {1'b0, data[15:1]}, u: False});
                 ioBuffer[channel] <= data;
             end
+        endmethod
+
+        method Action downlinkTick() if (init.done);
+            if ((downlinkTimer > 0) && (downlinkTimer < 1048575)) begin
+                downlinkTimer <= downlinkTimer - 1;
+            end
+        endmethod
+
+        method Bool downlinkReady() if (init.done);
+            return downlinkTimer == 0;
+        endmethod
+
+        method Action clearDownlink() if (init.done);
+            downlinkTimer <= 1048575;
         endmethod
     endinterface
 

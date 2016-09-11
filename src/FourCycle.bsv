@@ -77,6 +77,7 @@ module mkAGC(AGC);
         stage <= Decode;
     endrule
 
+    // Yay for breaking abstractions!
     rule decode((stage == Decode) && memory.init.done);
         $display("Decode--------------------------------------------------------------------------------------------");
         // Get the addr from Fetch
@@ -98,14 +99,21 @@ module mkAGC(AGC);
         if (!inISR && !hasOverflows && !isExtended && interruptsEnabled && !isValid(indexAddend) && (last.z != 'O4000) && (last.z != 'O4001)) begin
 
             if (memory.timers.t3IRUPT) begin
+                $display("Taking TIMER3 Interrupt!");
                 isrAddr = tagged Valid 'O4015;
                 memory.timers.clearT3IRUPT();
-            end else if (memory.timers.t4IRUPT) begin
-                isrAddr = tagged Valid 'O4021;
-                memory.timers.clearT4IRUPT();
+            //end else if (memory.timers.t4IRUPT) begin
+            //    display("Taking TIMER4 Interrupt!");
+            //    isrAddr = tagged Valid 'O4021;
+            //    memory.timers.clearT4IRUPT();
             end else if (dskyInterrupt) begin
+                $display("Taking DSKY Interrupt!");
                 isrAddr = tagged Valid 'O4025;
                 dskyInterrupt <= False;
+            end else if (io.internalIO.downlinkReady()) begin
+                $display("Taking Downlink Interrupt!");
+                isrAddr = tagged Valid 'O4041;
+                io.internalIO.clearDownlink();
             end
         end
 
@@ -319,14 +327,21 @@ module mkAGC(AGC);
         memory.imem.setZ(isValid(zFromDouble) ? zFromDouble.Valid + 2 : {0, last.newZ, 1'b0});
         zFromDouble <= tagged Invalid;
 
+        Bool wroteToIO = False;
+
         // Make the memory and I/O requests if necessary
         if (last.memAddrOrIOChannel matches tagged Addr .addr) begin
             memory.storer.memStore(addr, last.eRes1[15:0]);
         end else if (last.memAddrOrIOChannel matches tagged IOChannel .channel) begin
             io.internalIO.write(channel, last.eRes1[15:0]);
+            wroteToIO = True;
         end
         if (last.regNum matches tagged Valid .regNum) begin
             memory.storer.regStore(regNum, last.eRes2[15:0]);
+        end
+
+        if (!wroteToIO) begin
+            io.internalIO.downlinkTick();
         end
 
         // Set the new stage
@@ -364,9 +379,10 @@ module mkAGC(AGC);
 
             method Action hostToAGC(IOPacket packet) if ((stage != Init) && memory.init.done);
                 $display("IO Host to AGC: ", packet);
-                if ((packet.channel == 13) || (packet.channel == 26)) begin
-                    dskyInterrupt <= True;
-                end
+                // TODO: UNCOMMENT ME!
+                //if ((packet.channel == 13) || (packet.channel == 26)) begin
+                //    dskyInterrupt <= True;
+                //end
                 io.hostIO.hostToAGC(packet);
             endmethod
         endinterface

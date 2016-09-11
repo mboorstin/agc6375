@@ -61,6 +61,10 @@ interface InternalIO;
     method ActionValue#(Word) readResp();
 
     method Action write(IOChannel channel, Word data);
+
+    method Action downlinkTick();
+    method Bool downlinkReady();
+    method Action clearDownlink();
 endinterface
 
 interface AGCIO;
