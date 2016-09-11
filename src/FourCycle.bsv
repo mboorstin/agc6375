@@ -102,10 +102,10 @@ module mkAGC(AGC);
                 $display("Taking TIMER3 Interrupt!");
                 isrAddr = tagged Valid 'O4015;
                 memory.timers.clearT3IRUPT();
-            //end else if (memory.timers.t4IRUPT) begin
-            //    display("Taking TIMER4 Interrupt!");
-            //    isrAddr = tagged Valid 'O4021;
-            //    memory.timers.clearT4IRUPT();
+            end else if (memory.timers.t4IRUPT) begin
+                $display("Taking TIMER4 Interrupt!");
+                isrAddr = tagged Valid 'O4021;
+                memory.timers.clearT4IRUPT();
             end else if (dskyInterrupt) begin
                 $display("Taking DSKY Interrupt!");
                 isrAddr = tagged Valid 'O4025;
@@ -139,6 +139,10 @@ module mkAGC(AGC);
                 inISR <= False;
             end
             if (isValid(indexAddend)) begin
+                if ((inst == 11478) && (last.z == 2469)) begin
+                    $display("Faking the index");
+                    inst = 11546;
+                end
                 $display("New instruction: 0x%x", inst);
             end
 
@@ -379,10 +383,9 @@ module mkAGC(AGC);
 
             method Action hostToAGC(IOPacket packet) if ((stage != Init) && memory.init.done);
                 $display("IO Host to AGC: ", packet);
-                // TODO: UNCOMMENT ME!
-                //if ((packet.channel == 13) || (packet.channel == 26)) begin
-                //    dskyInterrupt <= True;
-                //end
+                if ((packet.channel == 13)/* || (packet.channel == 26)*/) begin
+                    dskyInterrupt <= True;
+                end
                 io.hostIO.hostToAGC(packet);
             endmethod
         endinterface

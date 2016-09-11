@@ -132,19 +132,6 @@ module mkAGCMemory(AGCMemory);
 
     interface IMemory imem;
         method Action req(Addr addr) if (memInit.done);
-            // toRealAddr is a pure function.
-            // DEBUGGING
-            if ((addr > 'O1777) && (addr <= 'O3777)) begin
-                Bit#(LFBankWords) addrInBank = truncate(addr);
-                Bit#(LFBanksArith) fbank = {1'b0, truncateLSB(iMemWrapper.readRegImm(rFB))};
-                if ((fbank >= 24) && superbankBit) begin
-                    fbank = fbank + 8;
-                end
-                $display("Bank,Addr:  o%o,o%o", fbank, addrInBank);
-            end
-            // END DEBUGGING
-
-
             iMemWrapper.readMem(toRealAddr(addr));
         endmethod
 
