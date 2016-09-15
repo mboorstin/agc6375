@@ -59,11 +59,12 @@ module mkAGC(AGC);
         $display("\n\nFetch---------------------------------------------------------------------------------------------");
         // Get the PC
         Word z = memory.imem.getZ();
+        $display("Uncorrected Z: 0x%x", z);
 
         // Get the actual address out of Z.  Z always holds the next address.
         // TAGLSB
         Addr zAddr = z[12:1];
-        Addr zAddrToFetch = subOnesCorrected(zAddr, 1);
+        Addr zAddrToFetch = zAddr == 1 ? 0 : subOnesCorrected(zAddr, 1);
 
         $display("Instruction address: o%o", zAddrToFetch);
 
