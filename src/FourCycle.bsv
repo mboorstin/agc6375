@@ -97,7 +97,7 @@ module mkAGC(AGC);
         Bool hasOverflows = memory.fetcher.hasOverflows();
         Maybe#(Addr) isrAddr = tagged Invalid;
 
-        if (!inISR && !hasOverflows && !isExtended && interruptsEnabled && !isValid(indexAddend) && (last.z != 'O4000) && (last.z != 'O4001)) begin
+        if (!inISR && !hasOverflows && !isExtended && interruptsEnabled && !isValid(indexAddend) && (last.z != 'O4000) && (last.z != 'O4001) && (last.z != 0) && (last.z != 1) && (last.z != 2)) begin
 
             if (memory.timers.t3IRUPT) begin
                 $display("Taking TIMER3 Interrupt!");
@@ -133,18 +133,13 @@ module mkAGC(AGC);
             if (isValid(indexAddend)) begin
                 $display("indexAddend is valid: instruction = 0x%x, indexAddend = 0x%x", inst[15:1], fromMaybe(?, indexAddend));
                 inst = handleIndex(inst);
+                $display("New instruction: 0x%x", inst);
             // RESUME
             end else if (inst[15:1] == 'O50017) begin
                 inst = memory.fetcher.readRegImm(rBRUPT);
                 last.z = memory.fetcher.getZRUPT();
                 inISR <= False;
-            end
-            if (isValid(indexAddend)) begin
-                if ((inst == 11478) && (last.z == 2469)) begin
-                    $display("Faking the index");
-                    inst = 11546;
-                end
-                $display("New instruction: 0x%x", inst);
+                $display("New instruction (RESUME): 0x%x", inst);
             end
 
             // Do the decode

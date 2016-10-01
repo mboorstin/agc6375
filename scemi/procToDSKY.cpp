@@ -193,8 +193,17 @@ void* runDSKYListener(void* arg) {
 
             loc = 0;
             dskyPacketToIOPacket(&inBuf, &outBuf);
-            fprintf(stderr, "Received data from yaDSKY2: channel o%o  data 0x%x\n", (unsigned int) outBuf.m_channel, (unsigned int) outBuf.m_data);
-            args->ioHostToAGC->sendMessage(outBuf);
+
+            unsigned int channel = outBuf.m_channel;
+            unsigned int data = outBuf.m_data;
+
+            fprintf(stderr, "Received data from yaDSKY2: channel o%o  data 0x%x\n", channel, data);
+            if ((channel == 13) && (data == 0x1F)) {
+                fprintf(stderr, "Ignoring blank keypress!\n");
+            }
+            else {
+                args->ioHostToAGC->sendMessage(outBuf);
+            }
         }
     }
 }
@@ -211,7 +220,7 @@ void* runAGCListener(void* arg) {
 
     while (true) {
         IOPacket packet = args->ioAGCToHost->getMessage();
-        printf("Received data from AGC: channel o%o  data 0x%x\n", (unsigned int) packet.m_channel, (unsigned int) packet.m_data);
+        // printf("Received data from AGC: channel o%o  data 0x%x\n", (unsigned int) packet.m_channel, (unsigned int) packet.m_data);
         ioPacketToDSKYPacket(&packet, &outBuf);
         if (!(*(args->dskyFD)) || (write(*(args->dskyFD), &outBuf, sizeof(DSKYPacket)) < 0)) {
             fprintf(stderr, "Error writing to socket!\n");
