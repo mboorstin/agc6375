@@ -10,7 +10,7 @@ DIR_SOURCE=src
 
 # BSV-related constants
 # List of modules to compile, separated by :
-BSV_MODULES=common:decode:exec:includes:io:memory
+BSV_MODULES=agc:agc/common:agc/decode:agc/exec:agc/includes:agc/io:agc/memory:scemi
 # Symlink for program to load (see discussion in AGCMemory.bsv)
 BSV_PROGRAM_PATH=$(DIR_BUILD)/program
 
@@ -41,7 +41,7 @@ debugging/ads: debugging/ads.bin
 simbuild:
 	# Compile
 	# -fdir dir is supposed to set the working directory, but doesn't seem to work.  Oh well.
-	cd $(DIR_SOURCE) && bsc -sim -p +:$(BSV_MODULES) -bdir ../$(DIR_BUILD) -D SIM -D PROGRAM_PATH='"$(BSV_PROGRAM_PATH)"' -u FourCycle.bsv
+	cd $(DIR_SOURCE) && bsc -sim -p +:$(BSV_MODULES) -bdir ../$(DIR_BUILD) -D SIM -D PROGRAM_PATH='"$(BSV_PROGRAM_PATH)"' -u scemi/SceMiHarness.bsv
 	# Link
 	cd $(DIR_BUILD) && bsc -sim -e mkAGC -o mkAGC mkAGC.ba
 

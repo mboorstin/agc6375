@@ -4,13 +4,14 @@
 New Work
 ========
 
-During the 2020 coronavirus epimedic we started up work on this again, using the open source https://github.com/B-Lang-org/bsc compiler.  I've started to clean up the work I did for 6.375 a few years ago, but things are still messy.
+During the 2020 coronavirus epidemic we started up work on this again, using the open source https://github.com/B-Lang-org/bsc compiler.  I've started to clean up the work I did for 6.375 a few years ago, but things are still messy.
 
 
 Prerequisites
 -------------
 
 * Bluespec: Follow the installation directions at https://github.com/B-Lang-org/bsc, and make sure the `bsc` binary is in your path.
+* SceMi: The basic Bluespec installation doesn't come with a copy of the Bluespec SceMi library.  Get a copy of it and put it in your Bluespec library directory.
 * yaYUL: Install `yaYUL` from https://github.com/virtualagc/virtualagc, and make sure it is in your path.
 
 

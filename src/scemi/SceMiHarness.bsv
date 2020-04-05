@@ -4,12 +4,9 @@ import DefaultValue::*;
 import GetPut::*;
 import SceMi::*;
 
-import Types::*;
+import FourCycle::*;
 import ResetXactor::*;
-
-// Where to find mkAGC
-// AGC_FILE is defined differently for each scemi build target
-import `AGC_FILE::*;
+import Types::*;
 
 typedef AGC DutInterface;
 
@@ -19,7 +16,7 @@ module [Module] mkDutWrapper (DutInterface);
     return m;
 endmodule
 
-module [SceMiModule] mkSceMiLayer();
+module [SceMiModule] mkSceMiHarness();
 
     SceMiClockConfiguration conf = defaultValue;
 
