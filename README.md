@@ -1,6 +1,43 @@
 6.375 Final Project: Apollo Guidance Computer
 =============================================
 
+New Work
+========
+
+During the 2020 coronavirus epimedic we started up work on this again, using the open source https://github.com/B-Lang-org/bsc compiler.  I've started to clean up the work I did for 6.375 a few years ago, but things are still messy.
+
+
+Prerequisites
+-------------
+
+* Bluespec: Follow the installation directions at https://github.com/B-Lang-org/bsc, and make sure the `bsc` binary is in your path.
+* yaYUL: Install `yaYUL` from https://github.com/virtualagc/virtualagc, and make sure it is in your path.
+
+
+Compiling Programs
+------------------
+
+To compile a program into a VMH that can be loaded into the AGC's memory, run `make $PROGRAM_NAME`, like so:
+
+```sh
+$ make debugging/ads
+```
+
+
+Building and Running in Simulation
+----------------------------------
+
+To build and run for Bluesim simulation, do the following, substituting `ads` for the name of a program you compiled above.
+
+```sh
+$ make simbuild
+$ make simrun PROGRAM=ads
+```
+
+
+Old Docs
+========
+
 Building
 --------
 

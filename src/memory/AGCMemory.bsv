@@ -10,6 +10,9 @@ import MemInit::*;
 import MemTypes::*;
 import Types::*;
 
+// It doesn't seem possible to define a void BDPI function.  Oh well.
+import "BDPI" function Bool getEnvVar(String varName, String value);
+
 typedef 8 EBanks;
 typedef TLog#(EBanks) LEBanks;
 typedef 256 EBankWords;
@@ -28,9 +31,12 @@ typedef TMul#(EBanks, EBankWords) FBankStart;
 module mkAGCMemory(AGCMemory);
     // Main state: BRAM and regFile
     BRAM_Configure cfg = defaultValue;
-    // Load a VMH in simulation so we don't have to transfer it over SceMi
     `ifdef SIM
-        cfg.loadFormat = Hex("program.vmh");
+        // Load a VMH in simulation so we don't have to transfer it over SceMi
+        // It's difficult to pass environment variables into Bluesim ($test$plusargs exists
+        // but $value$plusargs does not), so instead the Makefile symlinks the requested program
+        // to load at path PROGRAM_PATH.
+        cfg.loadFormat = Hex(`PROGRAM_PATH);
     `endif
 
     BRAM1Port#(MemAddr, Word) bram <- mkBRAM1Server(cfg);

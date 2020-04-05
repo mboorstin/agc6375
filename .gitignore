@@ -1,13 +1,12 @@
-build/
-out
-out.so
-simOut
-simOut.gz
-simOut.tar.gz
-synthOut*
-*.html
-*.lst
-*.jou
-*.log
+# Directories
+bin/**
+build/**
 
+# File extensions
+*.bin
+*.symtab
+*.vmh
+
+# Things to keep
 !.gitignore
+!.gitkeep
