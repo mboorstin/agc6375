@@ -41,9 +41,10 @@ debugging/ads: debugging/ads.bin
 simbuild:
 	# Compile
 	# -fdir dir is supposed to set the working directory, but doesn't seem to work.  Oh well.
-	cd $(DIR_SOURCE) && bsc -sim -p +:$(BSV_MODULES) -bdir ../$(DIR_BUILD) -D SIM -D PROGRAM_PATH='"$(BSV_PROGRAM_PATH)"' -u scemi/SceMiHarness.bsv
+	cd $(DIR_SOURCE) && bsc -sim -p +:$(BSV_MODULES) -bdir ../$(DIR_BUILD) -D SIM -D PROGRAM_PATH='"$(BSV_PROGRAM_PATH)"' -u scemi/SceMiBridge.bsv
+
 	# Link
-	cd $(DIR_BUILD) && bsc -sim -e mkAGC -o mkAGC mkAGC.ba
+	cd $(DIR_BUILD) && bsc -sim -e mkSceMiBridge -o mkSceMiBridge mkSceMiBridge.ba
 
 # Run the Bluesim simulator
 simrun:
@@ -53,7 +54,7 @@ endif
 	# Symlink the program to run (see discussion in AGCMemory.bsv)
 	ln -sf $(abspath $(DIR_BIN)/$(PROGRAM).bin.vmh) $(BSV_PROGRAM_PATH)
 	# Start the simulator
-	./$(DIR_BUILD)/mkAGC
+	./$(DIR_BUILD)/mkSceMiBridge
 
 
 #########

@@ -1,5 +1,3 @@
-// A lot of this is VERY liberally copied from 6.375's RISCV test harness
-
 import DefaultValue::*;
 import GetPut::*;
 import SceMi::*;
@@ -8,20 +6,19 @@ import FourCycle::*;
 import ResetXactor::*;
 import Types::*;
 
-typedef AGC DutInterface;
-
 (* synthesize *)
-module [Module] mkDutWrapper (DutInterface);
+module [Module] mkAGCWrapper (AGC);
     let m <- mkAGC();
     return m;
 endmodule
 
+// Main SceMi harness
 module [SceMiModule] mkSceMiHarness();
 
     SceMiClockConfiguration conf = defaultValue;
 
     SceMiClockPortIfc clkPort <- mkSceMiClockPort(conf);
-    DutInterface dut <- buildDutWithSoftReset(mkDutWrapper, clkPort);
+    AGC dut <- buildDutWithSoftReset(mkAGCWrapper, clkPort);
 
     Empty ioAGCToHost <- mkGetXactor(toGet(dut.hostIO.hostIO.agcToHost), clkPort);
     Empty ioHostToAGC <- mkPutXactor(toPut(dut.hostIO.hostIO.hostToAGC), clkPort);
@@ -31,4 +28,3 @@ module [SceMiModule] mkSceMiHarness();
 
     Empty shutdown <- mkShutdownXactor();
 endmodule
-
