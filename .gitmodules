@@ -1,0 +1,3 @@
+[submodule "src/harness/sim/vendor/BlueBasics"]
+	path = src/harness/sim/vendor/BlueBasics
+	url = git@github.com:CTSRD-CHERI/BlueBasics.git

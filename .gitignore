@@ -4,6 +4,7 @@ build/**
 
 # File extensions
 *.bin
+*.o
 *.symtab
 *.vmh
 

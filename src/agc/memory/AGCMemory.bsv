@@ -10,9 +10,6 @@ import MemInit::*;
 import MemTypes::*;
 import Types::*;
 
-// It doesn't seem possible to define a void BDPI function.  Oh well.
-import "BDPI" function Bool getEnvVar(String varName, String value);
-
 typedef 8 EBanks;
 typedef TLog#(EBanks) LEBanks;
 typedef 256 EBankWords;
