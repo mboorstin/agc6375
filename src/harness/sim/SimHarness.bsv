@@ -17,22 +17,25 @@ import Types::*;
 // one direction), but it will be very confusing if we ever move to a more complicated transport.
 //
 // InitLoad:  0x01 [2 byte address] [2 byte data]
-// InitDone:  0x02
-// Start:     0x03 [2 byte address]
-// HostToAGC: 0x04 [[1 bit u] [7 bits channel]] [2 byte data].
-// AGCToHost: 0x05 [[1 bit always 0] [7 bits channel]] [2 byte data].
+// InitIO:    0x02 [[1 bit u] [7 bits channel]] [2 byte data]
+// InitDone:  0x03
+// Start:     0x04 [2 byte address]
+// HostToAGC: 0x05 [[1 bit u] [7 bits channel]] [2 byte data]
+// AGCToHost: 0x06 [[1 bit always 0] [7 bits channel]] [2 byte data]
 
 typedef enum {
     // Leaving 0 open because it makes it a little easier to look at when debugging
     Invalid   = 0,
-    InitLoad  = 1,
-    InitDone  = 2,
-    Start     = 3,
-    HostToAGC = 4,
-    AGCToHost = 5
+    InitMem   = 1,
+    InitIO    = 2,
+    InitDone  = 3,
+    Start     = 4,
+    HostToAGC = 5,
+    AGCToHost = 6
 } Command deriving (Eq, Bits, FShow);
 
 typedef 5 ReadBufSz;
+typedef 4 WriteBufSz;
 
 (* synthesize *)
 module mkSimHarness ();
@@ -41,7 +44,7 @@ module mkSimHarness ();
     AGC agc <- mkAGC();
 
     // CharIO module for socket communication
-    CharIO charIO <- mkSocketCharIO("AGCHarness", `SIM_HARNESS_PORT);
+    CharIO charIO <- mkSocketCharIO("AGCHarness", `HARNESS_PORT);
 
     // Read buffer: We only need a total of 5 bytes for the read buffer.  Different commands
     // have different lengths so it's easier to use our own Buffer rather than using the
@@ -51,9 +54,20 @@ module mkSimHarness ();
     // to indicate that it's full.
     Reg#(Bit#(TLog#(TAdd#(ReadBufSz, 1)))) readBufLoc <- mkReg(0);
 
+    // Write buffer: We only need a total of 4 bytes for the write buffer.  We only need to write to
+    // it once and there's no need to write independently to it, so we have a single register for it
+    // rather than a vector.
+    Reg#(Vector#(WriteBufSz, Bit#(8))) writeBuf <- mkReg(replicate(0));
+    // Points to the next buffer entry to write to the output stream.  Tagged valid to indicate that
+    // the bytes need writing
+    Reg#(Maybe#(Bit#(TLog#(WriteBufSz)))) writeBufLoc <- mkReg(tagged Invalid);
+
     function Command currentCommand();
         return unpack(truncate(readBuf[0]));
     endfunction
+
+    // readNextByte() and writeNextByte() are separated to make it easier to separate the packet logic
+    // from the transport logic when we move to an FPGA
 
     // Bluespec's rule evaluation makes it difficult to read and execute in a single rule, because
     // some of the AGC methods have guards on them that, when invalid, block the entire rule.  In theory
@@ -62,19 +76,42 @@ module mkSimHarness ();
     // a rule for each command.  The command rules conflict with readNextByte because they all write to
     // readBufLoc, so they're set to higher precedence (thus preventing readNextByte from overwriting the buffer
     // in a cycle if they're reading it).
-    (* descending_urgency = "doHostToAGC, doStart, doInitDone, doInitLoad, readNextByte" *)
+    (* descending_urgency = "doHostToAGC, doStart, doInitDone, doInitIO, doInitMem, readNextByte" *)
     rule readNextByte;
         Bit#(8) data <- get(charIO.source);
         readBuf[readBufLoc] <= data;
         readBufLoc <= readBufLoc + 1;
     endrule
 
-    rule doInitLoad((currentCommand() == InitLoad) && (readBufLoc == 5));
+    // If we have valid data to write, write it
+    rule writeNextByte(isValid(writeBufLoc));
+        // Write the data to charIO
+        Bit#(TLog#(WriteBufSz)) writeBufLocVal = fromMaybe(?, writeBufLoc);
+        Bit#(8) data = writeBuf[writeBufLocVal];
+        charIO.sink.put(data);
+
+        // Advance the buffer counter or reset it
+        if (writeBufLocVal == fromInteger(valueOf(TSub#(WriteBufSz, 1)))) begin
+            // If we're at the end of the buffer, mark ourselves as invalid
+            writeBufLoc <= tagged Invalid;
+        end else begin
+            // Otherwise go on to the next one
+            writeBufLoc <= tagged Valid (writeBufLocVal + 1);
+        end
+    endrule
+
+    rule doInitMem((currentCommand() == InitMem) && (readBufLoc == 5));
         $display("[Harness] Passing InitLoad to AGC");
         agc.memInit.request.put(tagged InitLoad MemInitLoad{
             addr: {readBuf[1], readBuf[2]},
             data: {readBuf[3], readBuf[4]}
         });
+        readBufLoc <= 0;
+    endrule
+
+    rule doInitIO((currentCommand() == InitIO) && (readBufLoc == 4));
+        $display("[Harness] Passing InitIO to AGC");
+        // TODO!
         readBufLoc <= 0;
     endrule
 
@@ -90,11 +127,24 @@ module mkSimHarness ();
         readBufLoc <= 0;
     endrule
 
-    rule doHostToAGC((currentCommand() == HostToAGC) && (readBufLoc ==  5));
+    rule doHostToAGC((currentCommand() == HostToAGC) && (readBufLoc == 4));
         $display("[Harness] Passing HostToAGC to AGC");
         // TODO!
         readBufLoc <= 0;
     endrule
 
-    // TODO: Write rule!
+    // Implicitly guarded by the availability of agcToHost(), and can only write if the buffer is
+    // ready to be written to (ie, not currently being sent
+    rule doAGCToHost(!isValid(writeBufLoc));
+        IOPacket packet <- agc.hostIO.hostIO.agcToHost();
+        $display("[Harness] Got AGCToHostPacket");
+
+        // Write the packet to the buffer, and mark the buffer as ready to be read
+        Bit#(8) command = extend(pack(AGCToHost));
+
+        // There doesn't appear to be any easy vector literal syntax so we do it this way.  Note that
+        // vectors are packed with the highest index on the left
+        writeBuf <= unpack({packet.data[7:0], packet.data[15:8], {pack(packet.u), packet.channel}, command});
+        writeBufLoc <= tagged Valid 0;
+    endrule
 endmodule

@@ -13,4 +13,4 @@
 
 		# Data
 		SETLOC	4400
-		OCT 1
+		OCT 2

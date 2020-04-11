@@ -1,3 +1,5 @@
+.PHONY: clean testbench
+
 #############
 # Constants #
 #############
@@ -13,6 +15,7 @@ DIR_PROGRAMS=programs
 DIR_SOURCE=src
 
 # BSV-related constants
+BSV_FLAGS=-sim -keep-fires -aggressive-conditions -show-range-conflict
 # List of modules to compile, separated by :
 # TODO: Autogenerate these lists
 BSV_MODULES_COMMON=agc:agc/common:agc/decode:agc/exec:agc/includes:agc/io:agc/memory
@@ -20,12 +23,14 @@ BSV_MODULES_SIM=harness/sim/vendor/BlueBasics:harness/sim/vendor/CharIO
 # Symlink for program to load (see discussion in AGCMemory.bsv)
 BSV_PROGRAM_PATH=$(DIR_BUILD)/program
 
+# Harness related constants
+# Port for the harness to listen on
+HARNESS_PORT=19796
+
 # Simulation related constants
 # BDPI C files that need compiling.  Note this needs to be relative to the build directory
 SIM_BDPI_FILES_ROOT:=$(shell find $(DIR_SOURCE) -name '*.c')
 SIM_BDPI_FILES:=$(SIM_BDPI_FILES_ROOT:%=../%)
-# Port for the harness to listen on
-SIM_HARNESS_PORT=19796
 
 
 #######################
@@ -42,8 +47,11 @@ SIM_HARNESS_PORT=19796
 	# Convert it to a VMH
 	./toVMH.py $(DIR_BIN)/$(notdir $@) $(DIR_BIN)/$(notdir $*).vmh
 
+# TODO: Autogenerate this list, or maybe just get rid of it
 # Programs to compile
 debugging/ads: debugging/ads.bin
+debugging/io: debugging/io.bin
+debugging/timers: debugging/timers.bin
 
 
 #######################
@@ -54,11 +62,11 @@ debugging/ads: debugging/ads.bin
 simbuild:
 	# Compile
 	# -fdir dir is supposed to set the working directory, but doesn't seem to work.  Oh well.
-	# TODO: Pull out the BSC flags
-	cd $(DIR_SOURCE) && $(BSC) -cpp -Xcpp -I. -sim -p +:$(BSV_MODULES_COMMON):$(BSV_MODULES_SIM) -bdir ../$(DIR_BUILD) -D SIM -D PROGRAM_PATH='"$(BSV_PROGRAM_PATH)"' -D SIM_HARNESS_PORT=$(SIM_HARNESS_PORT) -u harness/sim/SimHarness.bsv
+	# TODO: Pull out some more BSC flags
+	cd $(DIR_SOURCE) && $(BSC) $(BSV_FLAGS) -cpp -Xcpp -I. -p +:$(BSV_MODULES_COMMON):$(BSV_MODULES_SIM) -bdir ../$(DIR_BUILD) -D SIM -D PROGRAM_PATH='"$(BSV_PROGRAM_PATH)"' -D HARNESS_PORT=$(HARNESS_PORT) -u harness/sim/SimHarness.bsv
 
 	# Link
-	cd $(DIR_BUILD) && $(BSC) -sim -e mkSimHarness -o mkSimHarness mkSimHarness.ba $(SIM_BDPI_FILES)
+	cd $(DIR_BUILD) && $(BSC) $(BSV_FLAGS) -e mkSimHarness -o mkSimHarness mkSimHarness.ba $(SIM_BDPI_FILES)
 
 # Run the Bluesim simulator
 simrun-%:
@@ -67,6 +75,15 @@ simrun-%:
 
 	# Start the simulator
 	./$(DIR_BUILD)/mkSimHarness
+
+
+#############
+# Testbench #
+#############
+
+# Start the testbench
+testbench:
+	python3 testbench/testbench.py -a localhost:$(HARNESS_PORT)
 
 
 #########

@@ -12,7 +12,7 @@ Prerequisites
 
 * Bluespec: Follow the installation directions at https://github.com/B-Lang-org/bsc, and make sure the `bsc` binary is in your path.
 * SceMi: The basic Bluespec installation doesn't come with a copy of the Bluespec SceMi library.  Get a copy of it and put it in your Bluespec library directory.
-* yaYUL: Install `yaYUL` from https://github.com/virtualagc/virtualagc, and make sure it is in your path.
+* VirtualAGC compontents: Install `yaDSKY2` and `yaYUL` from https://github.com/virtualagc/virtualagc, and make sure they are in your path.
 * Submodules: Get the submodules fetched with `git submodule update --init --recursive`.
 
 
