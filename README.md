@@ -1,6 +1,11 @@
 6.375 Final Project: Apollo Guidance Computer
 =============================================
 
+A Bluespec System Verilog implementation of the Apollo Guidance Computer for an MIT 6.375 final project.
+
+This project is heavily indebted to Ron Burkey's [VirtualAGC](https://www.ibiblio.org/apollo/index.html); in particular it uses his UI components (like `yaDSKY2`), his assembler and validation suite, and of course his documentation of the AGC itself.
+
+
 New Work
 ========
 

@@ -1,5 +1,6 @@
 // Vendored from https://raw.githubusercontent.com/CTSRD-CHERI/SocketPacketUtils/e7df4dd0f3ef6cbb0275e880e7c8ec88c91a8fde/socket_packet_utils.c
-// with the logging prefixes changed to match ours
+// with the logging prefixes changed to match ours, and with the socket listener modified
+// to set SO_REUSEADDR.
 
 /*-
  * Copyright (c) 2018 Matthew Naylor
@@ -159,6 +160,10 @@ extern inline void serv_socket_init(unsigned long long ptr)
   sockAddr.sin_family = AF_INET;
   sockAddr.sin_addr.s_addr = htonl(INADDR_ANY);
   sockAddr.sin_port = htons(s->port);
+  if (setsockopt(s->sock, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) < 0) {
+    perror("SO_REUSEADDR");
+    exit(EXIT_FAILURE);
+  }
   int ret = bind(s->sock, (struct sockaddr *) &sockAddr, sizeof(sockAddr));
   if (ret == -1) {
     perror("bind");
