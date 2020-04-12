@@ -41,7 +41,9 @@ SIM_BDPI_FILES:=$(SIM_BDPI_FILES_ROOT:%=../%)
 %.bin:
 	# Compile.  Annoyingly yaYUL doesn't let you specify an output directory, so it
 	# compiles in the source directory which is ugly.  We move it to the bin directory ourselves.
-	yaYUL $(DIR_PROGRAMS)/$(basename $@).agc
+	# yaYUL also doesn't seem to calculate include paths nicely, so it has to be run in the
+	# same directory as the main source file
+	cd $(DIR_PROGRAMS)/$(dir $@) && yaYUL $(basename $(notdir $@)).agc
 	mv $(DIR_PROGRAMS)/$(basename $@).agc.bin $(DIR_BIN)/$(notdir $@)
 	rm $(DIR_PROGRAMS)/$(basename $@).agc.symtab
 	# Convert it to a VMH

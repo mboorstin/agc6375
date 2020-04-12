@@ -46,7 +46,7 @@ Now that you have the simulation running, start up the testbench in a second win
 $ make testbench
 ```
 
-And finally start up the control UI.  You can either use `yaDSKY2` if you just want the keyapd, or `LM_Simulator` for more control panels.  Note that `LM_Simulator` won't start up unless the testbench is already serving the selected port.
+And finally start up the control UI.  You can either use `yaDSKY2` if you just want the keypad, or `LM_Simulator` for more control panels.  Note that `LM_Simulator` won't start up unless the testbench is already serving the selected port.
 
 ```sh
 $ LM_Simulator --port 19797
