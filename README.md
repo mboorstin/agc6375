@@ -56,5 +56,5 @@ In order to add a new harness, such as a new simulation type or a new FPGA trans
   - `agc.hostIO.init(IOPacket packet)` to initialize the I/O buffers.
   - `agc.memInit.InitDone()` to mark the program memory as initialized.  You must call this even if you're not using `MemInit.InitLoad()`.
   - `agc.start(uint16_t addr)` to actually start the AGC.  You probably want to start it at `04001`.
-  - `agc.hostIO.hostToAGC(IOPacket packet)` to send data to the AGC's I/O channels.
-  - `agc.hostIO.agcToHost() => IOPacket` to receive data from the AGC's I/O channels.
+  - `agc.hostIO.hostIO.hostToAGC(IOPacket packet)` to send data to the AGC's I/O channels.
+  - `agc.hostIO.hostIO.agcToHost() => IOPacket` to receive data from the AGC's I/O channels.
