@@ -66,6 +66,14 @@ module mkSimHarness ();
         return unpack(truncate(readBuf[0]));
     endfunction
 
+    function IOPacket ioPacketFromBuffer();
+        return IOPacket{
+            u: unpack(readBuf[1][7:7]),
+            channel: readBuf[1][6:0],
+            data: {readBuf[2], readBuf[3]}
+        };
+    endfunction
+
     // readNextByte() and writeNextByte() are separated to make it easier to separate the packet logic
     // from the transport logic when we move to an FPGA
 
@@ -111,7 +119,7 @@ module mkSimHarness ();
 
     rule doInitIO((currentCommand() == InitIO) && (readBufLoc == 4));
         $display("[Harness] Passing InitIO to AGC");
-        // TODO!
+        agc.hostIO.init(ioPacketFromBuffer());
         readBufLoc <= 0;
     endrule
 
@@ -129,7 +137,7 @@ module mkSimHarness ();
 
     rule doHostToAGC((currentCommand() == HostToAGC) && (readBufLoc == 4));
         $display("[Harness] Passing HostToAGC to AGC");
-        // TODO!
+        agc.hostIO.hostIO.hostToAGC(ioPacketFromBuffer());
         readBufLoc <= 0;
     endrule
 

@@ -52,6 +52,7 @@ SIM_BDPI_FILES:=$(SIM_BDPI_FILES_ROOT:%=../%)
 debugging/ads: debugging/ads.bin
 debugging/io: debugging/io.bin
 debugging/timers: debugging/timers.bin
+demo/demo: demo/demo.bin
 
 
 #######################

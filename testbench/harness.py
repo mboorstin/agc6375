@@ -1,7 +1,7 @@
 import socket
 import threading
 
-# Class to handle communication with the harness
+# Class to handle communication with the harness.  See SimHarness.bsv for the packet structures.
 
 class Harness:
 
@@ -54,19 +54,19 @@ class Harness:
         self.sendStart(self.ADDR_START)
 
     # Low level send functionality to handle bit packing and such
-    def send(self, command, data):
-        # Build the packet by prefixing the 1 byte command to the data.  Byteorder doesn't matter
+    def send(self, command, encodedData):
+        # Build the packet by prefixing the 1 byte command to the encoded data.  Byteorder doesn't matter
         # for a 1-byte array but the function requires it
-        packet = command.to_bytes(1, byteorder = 'big') + data
+        packet = command.to_bytes(1, byteorder = 'big') + encodedData
         self.socket.send(packet)
 
     def sendInitMem(self):
         raise Exception('Not implemented yet!')
 
-    def sendInitIO(self, channel, message):
+    def sendInitIO(self, channel, data):
         # IO initialization always has a u of 0, so we zero out the top bit of the channel
-        data = (channel & 0x7F).to_bytes(1, byteorder = 'big') + message.to_bytes(2, byteorder = 'big')
-        self.send(self.COMMAND_INIT_IO, data)
+        encodedData = (channel & 0x7F).to_bytes(1, byteorder = 'big') + data.to_bytes(2, byteorder = 'big')
+        self.send(self.COMMAND_INIT_IO, encodedData)
 
     def sendInitDone(self):
         self.send(self.COMMAND_INIT_DONE, b'')
@@ -75,8 +75,13 @@ class Harness:
     def sendStart(self, startZ):
         self.send(self.COMMAND_START, startZ.to_bytes(2, byteorder = 'big'))
 
-    def sendHostToAGC(self):
-        raise Exception('Not implemented yet!')
+    def sendHostToAGC(self, u, channel, data):
+        # Python's struct library doesn't seem to support individual bits, so we have to do it manually
+        ubit = 0x80 if (u == 1) else 0x0
+        channelBits = ubit | (channel & 0x7F)
+        encodedData = channelBits.to_bytes(1, byteorder = 'big') + data.to_bytes(2, byteorder = 'big')
+
+        self.send(self.COMMAND_HOST_TO_AGC, encodedData)
 
     # Thread to read from the handler
     def readHandler(self):
@@ -86,7 +91,6 @@ class Harness:
             data = self.socket.recv(self.READ_PACKET_SIZE, socket.MSG_WAITALL)
             if not data:
                 raise Exception('Error receiving data from harness; exiting.')
-            print('[Testbench] Received data 0x%s from the harness' % (data.hex()))
 
             # Parse the data.  Python's struct library doesn't seem to support individual bits, so since we're already doing
             # bit manipulations might as well do all of them

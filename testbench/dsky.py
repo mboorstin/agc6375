@@ -32,18 +32,27 @@ class DSKY:
         print('[Testbench] Got DSKY connection')
         # Listen for 4 byte packets from the DSKY
         while True:
-            data = self.clientSock.recv(self.DSKY_PACKET_SIZE)
+            data = self.clientSock.recv(self.DSKY_PACKET_SIZE, socket.MSG_WAITALL)
             if not data:
                 raise Exception('Error receiving data from DSKY; exiting.')
-            print('[Testbench] Received data 0x%s from the DSKY' % (data.hex()))
-            raise Exception('Not implemented yet!')
+
+            # Have to parse a similar structure as sendPacket().  Again, it would be
+            # nice if Python's struct library let you specify bit lengths.
+            u = (data[0] & 0x20) >> 5
+            channel = ((data[0] & 0x0F) << 3) | ((data[1] & 0x38) >> 3)
+            data = ((data[1] & 0x07) << 12) | ((data[2] & 0x3F) << 6) | (data[3] & 0x3F)
+            print('[Testbench] Received data (%d, %d, 0x%x) from the DSKY' % (u, channel, data))
+
+            # Send it to the handler
+            self.hostToAGCCB(u, channel, data)
 
     # Send a packet to the DSKY
     def sendPacket(self, u, channel, data):
-        print('[Testbench] Writing data (%d, %d, 0x%x) to the DSKY' % (u, channel, data))
+        # print('[Testbench] Writing data (%d, %d, 0x%x) to the DSKY' % (u, channel, data))
         # DSKY packets are of the form 00utpppp 01pppddd 10dddddd 11dddddd, where p is the channel
-        # bits and d is the data bits.  Python's struct library doesn't let you specify exact bit
-        # lengths, so we're on our own here.  Oh well.  Note that t is always 0.
+        # bits and d is the data bits (I'm using yaDSKY's nomenclature; not sure why he's calling it p).
+        # Python's struct library doesn't let you specify exact bit lengths, so we're on our own here.
+        # Note that t is always 0.
         packet = bytearray([])
 
         ubit = 0x20 if (u == 1) else 0x0
@@ -60,5 +69,4 @@ class DSKY:
         dLower = data & 0x3F
         packet += (0xC0 | dLower).to_bytes(1, byteorder = 'big')
 
-        print('[Testbench] Encoded data 0x%s' % packet.hex())
         self.clientSock.send(packet)
