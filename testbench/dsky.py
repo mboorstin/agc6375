@@ -41,7 +41,7 @@ class DSKY:
             u = (data[0] & 0x20) >> 5
             channel = ((data[0] & 0x0F) << 3) | ((data[1] & 0x38) >> 3)
             data = ((data[1] & 0x07) << 12) | ((data[2] & 0x3F) << 6) | (data[3] & 0x3F)
-            print('[Testbench] Received data (%d, %d, 0x%x) from the DSKY' % (u, channel, data))
+            # print('[Testbench] Received data (%d, %d, 0x%x) from the DSKY' % (u, channel, data))
 
             # Send it to the handler
             self.hostToAGCCB(u, channel, data)

@@ -47,13 +47,6 @@ SIM_BDPI_FILES:=$(SIM_BDPI_FILES_ROOT:%=../%)
 	# Convert it to a VMH
 	./toVMH.py $(DIR_BIN)/$(notdir $@) $(DIR_BIN)/$(notdir $*).vmh
 
-# TODO: Autogenerate this list, or maybe just get rid of it
-# Programs to compile
-debugging/ads: debugging/ads.bin
-debugging/io: debugging/io.bin
-debugging/timers: debugging/timers.bin
-demo/demo: demo/demo.bin
-
 
 #######################
 # Bluespec Simulation #
