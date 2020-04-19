@@ -848,14 +848,22 @@ function Exec2Writeback ioWrite(ExecFuncArgs args);
                 ioWriteOp(args.instNum, args.memOrIOResp[15:0], args.regResp[15:0]) :
                 signExtend(ioWriteOp(args.instNum, args.memOrIOResp[15:1], overflowCorrect(args.regResp[15:0])));
 
-     return Exec2Writeback {
+    if (channel == 'O33) begin
+        // Bits 11 through 15 are latched inputs, and we have to do this to keep their values  See comment
+        // at https://github.com/virtualagc/virtualagc/blob/f1ff0cf084f65e1f0bf26d1621b91409cbe0ccac/yaAGC/agc_engine.c#L409.
+        // Note that at this point we only care about the *bottom* 15 bits of resp (see below where
+        // we take resp[14:0]).
+        resp = resp | 'O76000;
+    end
+
+    return Exec2Writeback {
         eRes1: is16Bits ? {?, resp} : {?, resp[14:0], 1'b0},
         eRes2: {?, resp},
         memAddrOrIOChannel: tagged IOChannel channel,
         // Extra write to rA for WRITE doesn't hurt
         regNum: tagged Valid rA,
         newZ: args.z + 1
-     };
+    };
 endfunction
 
 

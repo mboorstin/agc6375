@@ -40,9 +40,11 @@ class Harness:
         self.listenerThread = threading.Thread(target = self.readHandler)
         self.listenerThread.start()
 
-        # Initialize the I/O buffer.  I believe this is necessary to control which
-        # channels the DSKY can overwrite with its packets (?)
-        self.sendInitIO(0o32, 0x2000)
+        # Initialize the I/O channels.  These seem to be initial start up settings.
+        self.sendInitIO(0o30, 0o37777);
+        self.sendInitIO(0o31, 0o77777);
+        self.sendInitIO(0o32, 0o77777);
+        self.sendInitIO(0o33, 0o77777);
 
         # For now, skipping memory initialization
 
