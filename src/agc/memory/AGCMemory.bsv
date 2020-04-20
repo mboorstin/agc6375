@@ -50,9 +50,10 @@ module mkAGCMemory(AGCMemory);
     Reg#(Bool) superbankBit <- mkReg(False);
 
     // Start this at 1 to skip the initial T3 increment so its first fire is 10ms after startup.
-    Reg#(Bit#(19)) masterTimer <- mkReg(1);
+    Reg#(Bit#(19)) masterTimer <- mkReg(0);
     Reg#(Bool) t3IRUPT <- mkReg(False);
     Reg#(Bool) t4IRUPT <- mkReg(False);
+    Reg#(Bool) t5IRUPT <- mkReg(False);
     Reg#(Bool) downrupt <- mkReg(False);
 
     // HACK: Write ports need to be first to keep pipeline FIFO's happy, and we know
@@ -60,16 +61,17 @@ module mkAGCMemory(AGCMemory);
     MemAndRegWrapper iMemWrapper <- mkMemAndRegWrapper(bram.portA, regFile, 1, 0, 0, 0);
     MemAndRegWrapper dMemWrapper <- mkMemAndRegWrapper(bram.portA, regFile, 3, 1 /*not actually used*/, 1, 2);
 
-    // Trigger timers when necessary.  One cycle of masterTimer takes 10 ms.  T3 and T4 are *incremented* every 10ms,
-    // with T4 canonically incrementing 7.5ms after T3, (and fire when overflowed, but software usually resets them very close to
-    // the overflow point to get a faster fire).  DOWNRUPT *fires* every 20ms.  This loop takes 20ms, so we increment T3
-    // at 0 and 10ms, increment T4 at 7.5ms and 17.5ms, and fire DOWNRUPT at 14ms.  There's no guidance for when exactly DOWNRUPT fires
-    // so we've chosen 14 to do our best to space things out.
+    // Trigger timers when necessary.  One cycle of masterTimer takes 10 ms.  T3, T4, and T5 are *incremented* every 10ms,
+    // with T5 canonically increasing 5ms after T3, and T4 canonically incrementing 7.5ms after T3, (and fire when overflowed, but
+    // software usually resets them very close to the overflow point to get a faster fire).  DOWNRUPT *fires* every 20ms.  This
+    // loop takes 20ms, so we increment T3 at 0 and 10ms, increment T4 at 7.5ms and 17.5ms, increment T5 at 5 ms and 15ms, and fire
+    // DOWNRUPT at 13ms.  There's no guidance for when exactly DOWNRUPT fires so we've chosen 13 to do our best to space things out.
+    // TODO: Make this logic more elegant and figure out how to templatize it
     rule tick(memInit.done);
         Bit#(19) newTime = masterTimer + 1;
         if ((masterTimer == 0) ||
             (masterTimer == fromInteger(valueOf(TMul#(10, TICKS_PER_MS))))) begin
-            // 0ms and 10ms: Fire T3
+            // 0ms and 10ms: Increment T3
 
             Bit#(15) newVal = addOnesUncorrected(regFile[rTIME3][4][15:1], zeroExtend(1'b1));
             // Ie, overflowed into negatives
@@ -80,7 +82,7 @@ module mkAGCMemory(AGCMemory);
             regFile[rTIME3][4] <= {newVal, 1'b0};
         end else if ((masterTimer == fromInteger(valueOf(TAdd#(TMul#(7, TICKS_PER_MS), TICKS_PER_500US)))) ||
                      (masterTimer == fromInteger(valueOf(TAdd#(TMul#(17, TICKS_PER_MS), TICKS_PER_500US))))) begin
-            // 7.5ms and 17.5ms: Fire T4
+            // 7.5ms and 17.5ms: Increment T4
 
             Bit#(15) newVal = addOnesUncorrected(regFile[rTIME4][4][15:1], zeroExtend(1'b1));
             // Ie, overflowed into negatives
@@ -89,8 +91,19 @@ module mkAGCMemory(AGCMemory);
                 newVal = 0;
             end
             regFile[rTIME4][4] <= {newVal, 1'b0};
-        end else if (masterTimer == fromInteger(valueOf(TMul#(14, TICKS_PER_MS)))) begin
-            // 1/2: Fire DOWNRUPT every 2 cycles.
+        end else if ((masterTimer == fromInteger(valueOf(TMul#(5, TICKS_PER_MS)))) ||
+                     (masterTimer == fromInteger(valueOf(TMul#(15, TICKS_PER_MS))))) begin
+            // 5ms and 15ms: Increment T5
+
+            Bit#(15) newVal = addOnesUncorrected(regFile[rTIME5][4][15:1], zeroExtend(1'b1));
+            // Ie, overflowed into negatives
+            if (newVal == {1'b1, 0}) begin
+                t5IRUPT <= True;
+                newVal = 0;
+            end
+            regFile[rTIME5][4] <= {newVal, 1'b0};
+        end else if (masterTimer == fromInteger(valueOf(TMul#(13, TICKS_PER_MS)))) begin
+            // 13: Fire Downrupt
 
             downrupt <= True;
         end else if (masterTimer == fromInteger(valueOf(TMul#(20, TICKS_PER_MS)))) begin
@@ -238,6 +251,14 @@ module mkAGCMemory(AGCMemory);
 
         method Action clearT4IRUPT() if (memInit.done);
             t4IRUPT <= False;
+        endmethod
+
+        method Bool t5IRUPT() if (memInit.done);
+            return t5IRUPT;
+        endmethod
+
+        method Action clearT5IRUPT() if (memInit.done);
+            t5IRUPT <= False;
         endmethod
 
         method Bool downrupt() if (memInit.done);

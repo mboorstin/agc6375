@@ -94,7 +94,11 @@ module mkAGC(AGC);
 
         if (!inISR && !hasOverflows && !isExtended && interruptsEnabled && !isValid(indexAddend) && (last.z != 'O4000) && (last.z != 'O4001)) begin
 
-            if (memory.timers.t3IRUPT) begin
+            if (memory.timers.t5IRUPT) begin
+                $display("Firing T5");
+                isrAddr = tagged Valid 'O4011;
+                memory.timers.clearT5IRUPT();
+            end else if (memory.timers.t3IRUPT) begin
                 $display("Firing T3");
                 isrAddr = tagged Valid 'O4015;
                 memory.timers.clearT3IRUPT();

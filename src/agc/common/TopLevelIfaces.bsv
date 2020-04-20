@@ -45,6 +45,8 @@ interface TimerProvider;
     method Action clearT3IRUPT();
     method Bool t4IRUPT();
     method Action clearT4IRUPT();
+    method Bool t5IRUPT();
+    method Action clearT5IRUPT();
     method Bool downrupt();
     method Action clearDOWNRUPT();
 endinterface
