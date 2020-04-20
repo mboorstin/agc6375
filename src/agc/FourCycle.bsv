@@ -48,11 +48,10 @@ module mkAGC(AGC);
     Reg#(Bool) dskyInterrupt <- mkReg(False);
 
     function Instruction handleIndex(Instruction inst);
-        // We basically need to treat inst as unsigned and indexAddend as signed.
-        // This presumes INDEX ignores overflow - it's not actually specified as such but seems the most reasonable option.
-        Bit#(15) topBitZerod = addOnesUncorrected({1'b0, inst[14:1]}, fromMaybe(?, indexAddend)[15:1]);
-        Bit#(1) topBit = inst[15] ^ topBitZerod[14];
-        return {topBit, topBitZerod[13:0], 1'b0};
+        // This presumes INDEX corrects overflow - it's not actually specified as such but it's what
+        // VirtualAGC does and it seems reasonable enough.
+        Bit#(15) topBitZerod = addOnesCorrected(inst[15:1], fromMaybe(?, indexAddend)[15:1]);
+        return {topBitZerod, 1'b0};
     endfunction
 
     rule fetch((stage == Fetch) && memory.init.done);
