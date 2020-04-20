@@ -754,7 +754,13 @@ endfunction
 // The "Transfer Control" (or "Transfer Control setting up a Return") instruction calls a subroutine,
 // first preparing for a later return to the instruction following the TC instruction.
 function Exec2Writeback tc(ExecFuncArgs args);
-    Word zData = args.regResp[15:0];
+    // Have to pad it on the right to mimic Z's parity bit (which last.z, being an address,
+    // doesn't store).
+    // It's important to get this data from args.z, rather than loading rZ directly, because
+    // if there's an interrupt during the execution of TC, rZ won't be correct after we RESUME
+    // and finish execution of the TC (rZ will be pointing to the address after the RESUME until the
+    // TC finishes executing).
+    Word zData = zeroExtend({args.z, 1'b0});
 
     return Exec2Writeback {
         eRes1: ?,

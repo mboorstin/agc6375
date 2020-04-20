@@ -385,7 +385,7 @@ endfunction
 function DecodeRes dTC();
     return DecodeRes {
         memAddrOrIOChannel: tagged None,
-        regNum: tagged Valid rZ,
+        regNum: tagged Invalid,
         instNum: TC
     };
 endfunction

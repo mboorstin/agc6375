@@ -64,8 +64,6 @@ module mkAGC(AGC);
         Addr zAddr = z[12:1];
         Addr zAddrToFetch = subOnesCorrected(zAddr, 1);
 
-        $display("Z: o%o", zAddrToFetch);
-
         // Fire the load request
         memory.imem.req(zAddrToFetch);
 
@@ -95,22 +93,18 @@ module mkAGC(AGC);
         if (!inISR && !hasOverflows && !isExtended && interruptsEnabled && !isValid(indexAddend) && (last.z != 'O4000) && (last.z != 'O4001)) begin
 
             if (memory.timers.t5IRUPT) begin
-                $display("Firing T5");
                 isrAddr = tagged Valid 'O4011;
                 memory.timers.clearT5IRUPT();
             end else if (memory.timers.t3IRUPT) begin
-                $display("Firing T3");
                 isrAddr = tagged Valid 'O4015;
                 memory.timers.clearT3IRUPT();
             end else if (memory.timers.t4IRUPT) begin
-                $display("Firing T4");
                 isrAddr = tagged Valid 'O4021;
                 memory.timers.clearT4IRUPT();
             end else if (dskyInterrupt) begin
                 isrAddr = tagged Valid 'O4025;
                 dskyInterrupt <= False;
             end else if (memory.timers.downrupt) begin
-                $display("Firing DOWNRUPT");
                 isrAddr = tagged Valid 'O4041;
                 memory.timers.clearDOWNRUPT();
             end
