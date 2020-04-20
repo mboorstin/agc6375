@@ -17,7 +17,7 @@ typedef 256 EBankWords;
 typedef TLog#(EBankWords) LEBankWords;
 
 typedef 36 FBanks;
-typedef 5 LFBanks;
+typedef TLog#(FBanks) LFBanks;
 typedef 1024 FBankWords;
 typedef TLog#(FBankWords) LFBankWords;
 
@@ -131,7 +131,9 @@ module mkAGCMemory(AGCMemory);
             Bit#(LFBankWords) addrInBank = truncate(addr);
             // Switched fixed
             if (addr <= 'O3777) begin
-                fbank = truncateLSB(iMemWrapper.readRegImm(rFB));
+                // We want the top 5 bits from FB; the 6th bit is only needed for possible
+                // overflow when we check the superbankBit below.
+                fbank = {1'b0, truncateLSB(iMemWrapper.readRegImm(rFB))};
                 // Lower banks are directly accessible via FB; upper ones
                 // are switched via the FEB bit.
                 if ((fbank >= 24) && superbankBit) begin
@@ -146,7 +148,7 @@ module mkAGCMemory(AGCMemory);
                 // Upper half of fixed-fixed: really fixed bank 03
                 fbank = 3;
             end
-            return tagged MemAddr zeroExtend(fromInteger(valueOf(FBankStart)) + {fbank, addrInBank});
+            return tagged MemAddr (fromInteger(valueOf(FBankStart)) + {fbank, addrInBank});
         end
     endfunction
 
