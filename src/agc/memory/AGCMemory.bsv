@@ -61,8 +61,9 @@ module mkAGCMemory(AGCMemory);
     MemAndRegWrapper iMemWrapper <- mkMemAndRegWrapper(bram.portA, regFile, 1, 0, 0, 0);
     MemAndRegWrapper dMemWrapper <- mkMemAndRegWrapper(bram.portA, regFile, 3, 1 /*not actually used*/, 1, 2);
 
-    // Trigger timers when necessary.  One cycle of masterTimer takes 10 ms.  T3, T4, and T5 are *incremented* every 10ms,
-    // with T5 canonically increasing 5ms after T3, and T4 canonically incrementing 7.5ms after T3, (and fire when overflowed, but
+    // Trigger timers when necessary.  One cycle of masterTimer takes 10 ms.  T1, T3, T4, and T5 are *incremented* every 10ms.
+    // T1 (and its associated T2) don't cause interrupts, so we can increment them at the same time as T3.
+    // T5 canonically increments 5ms after T3, and T4 canonically increments 7.5ms after T3 (T3-T5 fire when overflowed, but
     // software usually resets them very close to the overflow point to get a faster fire).  DOWNRUPT *fires* every 20ms.  This
     // loop takes 20ms, so we increment T3 at 0 and 10ms, increment T4 at 7.5ms and 17.5ms, increment T5 at 5 ms and 15ms, and fire
     // DOWNRUPT at 13ms.  There's no guidance for when exactly DOWNRUPT fires so we've chosen 13 to do our best to space things out.
@@ -71,8 +72,19 @@ module mkAGCMemory(AGCMemory);
         Bit#(19) newTime = masterTimer + 1;
         if ((masterTimer == 0) ||
             (masterTimer == fromInteger(valueOf(TMul#(10, TICKS_PER_MS))))) begin
-            // 0ms and 10ms: Increment T3
+            // 0ms and 10ms: Increment T1 and T3
 
+            // T1
+            Bit#(15) newT1 = addOnesUncorrected(regFile[rTIME1][4][15:1], zeroExtend(1'b1));
+            // Overflow, so increment T2
+            if (newT1 == {1'b1, 0}) begin
+                newT1 = 0;
+                // Note that TIME2 is only 14 bits, not 15 as usual
+                regFile[rTIME2][4] <= {zeroExtend(addOnesUncorrected(regFile[rTIME2][4][14:1], zeroExtend(1'b1))), 1'b0};
+            end
+            regFile[rTIME1][4] <= {newT1, 1'b0};
+
+            // T3
             Bit#(15) newVal = addOnesUncorrected(regFile[rTIME3][4][15:1], zeroExtend(1'b1));
             // Ie, overflowed into negatives
             if (newVal == {1'b1, 0}) begin
