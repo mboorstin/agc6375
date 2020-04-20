@@ -56,7 +56,6 @@ module mkAGC(AGC);
     endfunction
 
     rule fetch((stage == Fetch) && memory.init.done);
-        $display("\n\nFetch---------------------------------------------------------------------------------------------");
         // Get the PC
         Word z = memory.imem.getZ();
 
@@ -65,7 +64,7 @@ module mkAGC(AGC);
         Addr zAddr = z[12:1];
         Addr zAddrToFetch = subOnesCorrected(zAddr, 1);
 
-        $display("Instruction address: o%o", zAddrToFetch);
+        $display("Z: o%o", zAddrToFetch);
 
         // Fire the load request
         memory.imem.req(zAddrToFetch);
@@ -78,10 +77,8 @@ module mkAGC(AGC);
     endrule
 
     rule decode((stage == Decode) && memory.init.done);
-        $display("Decode--------------------------------------------------------------------------------------------");
         // Get the addr from Fetch
         Fetch2Decode last = f2d.first();
-        $display("f2d.first: ", fshow(last));
         f2d.deq();
 
         // Get the instruction from memory
@@ -98,14 +95,20 @@ module mkAGC(AGC);
         if (!inISR && !hasOverflows && !isExtended && interruptsEnabled && !isValid(indexAddend) && (last.z != 'O4000) && (last.z != 'O4001)) begin
 
             if (memory.timers.t3IRUPT) begin
+                $display("Firing T3");
                 isrAddr = tagged Valid 'O4015;
                 memory.timers.clearT3IRUPT();
             end else if (memory.timers.t4IRUPT) begin
+                $display("Firing T4");
                 isrAddr = tagged Valid 'O4021;
                 memory.timers.clearT4IRUPT();
             end else if (dskyInterrupt) begin
                 isrAddr = tagged Valid 'O4025;
                 dskyInterrupt <= False;
+            end else if (memory.timers.downrupt) begin
+                $display("Firing DOWNRUPT");
+                isrAddr = tagged Valid 'O4041;
+                memory.timers.clearDOWNRUPT();
             end
         end
 
@@ -122,7 +125,6 @@ module mkAGC(AGC);
         end else begin
             // Add the index to it if necessary
             if (isValid(indexAddend)) begin
-                $display("indexAddend is valid: instruction = 0x%x, indexAddend = 0x%x", inst[15:1], fromMaybe(?, indexAddend));
                 inst = handleIndex(inst);
             // RESUME
             end else if (inst[15:1] == 'O50017) begin
@@ -130,18 +132,12 @@ module mkAGC(AGC);
                 last.z = memory.fetcher.getZRUPT();
                 inISR <= False;
             end
-            if (isValid(indexAddend)) begin
-                $display("New instruction: 0x%x", inst);
-            end
 
             // Do the decode
             DecodeRes decoded = decode(inst, isExtended);
 
-            $display("Decoded instruction: ", fshow(decoded.instNum));
-
             // Do the memory and IO requests
             if (decoded.memAddrOrIOChannel matches tagged Addr .addr) begin
-               $display("Requesting data load: o%o", addr);
                memory.fetcher.memReq(addr);
             end else if (decoded.memAddrOrIOChannel matches tagged IOChannel .channel) begin
                 io.internalIO.readReq(channel);
@@ -183,7 +179,6 @@ module mkAGC(AGC);
                 d2e.enq(d2eArgs);
 
                 if (decoded.instNum == EDRUPT) begin
-                    $display("Got EDRUPT!");
                     stage <= Finished;
                 end else begin
                     stage <= Exec;
@@ -194,11 +189,8 @@ module mkAGC(AGC);
     endrule
 
     rule decodeDouble((stage == DecodeDouble) && memory.init.done);
-        $display("DecodeDouble--------------------------------------------------------------------------------------");
-
         // Get the data from decode
         Decode2Exec last = d2dd.first();
-        $display("d2dd.first: ", fshow(last));
         d2dd.deq();
 
         DecodeRes decoded = last.decoded;
@@ -223,10 +215,8 @@ module mkAGC(AGC);
     endrule
 
     rule execute((stage == Exec) && memory.init.done);
-        $display("Execute-------------------------------------------------------------------------------------------");
         // Get the data from decode
         Decode2Exec last = d2e.first();
-        $display("d2e.first: ", fshow(last));
         d2e.deq();
 
         DecodeRes decoded = last.decoded;
@@ -257,12 +247,7 @@ module mkAGC(AGC);
             regResp: {last.fromRegForDouble, regRespLower}
         };
 
-        //Bit#(15) one = 1;
-        //$display("test: ", fshow(subOnes(one, one)));
-
-        $display("execArgs: ", fshow(execArgs));
         Exec2Writeback execRes = exec(execArgs);
-        $display("execRes: ", fshow(execRes));
 
         // Set the index addend if necessary
         indexAddend <= (decoded.instNum == INDEX) ? tagged Valid execRes.eRes2[15:0] : tagged Invalid;
@@ -271,7 +256,6 @@ module mkAGC(AGC);
             // Handle division
             DP dividend = {overflowCorrect(last.fromRegForDouble), overflowCorrect(regRespLower)};
             SP divisor = is16BitRegM(decoded.memAddrOrIOChannel.Addr) ? overflowCorrect(last.fromMemForDouble) : last.fromMemForDouble[15:1];
-            $display("In exec: Dividend: %x, divisor: %x", dividend, divisor);
             divider.req(dividend, divisor);
             stage <= WritebackDivide;
         end else begin
@@ -284,8 +268,6 @@ module mkAGC(AGC);
     endrule
 
     rule writebackDouble((stage == WritebackDouble) && memory.init.done);
-        $display("WritebackDouble-----------------------------------------------------------------------------------");
-
         // Get the data from execute - note that we don't dequeue
         Exec2Writeback last = e2w.first();
 
@@ -309,10 +291,8 @@ module mkAGC(AGC);
     endrule
 
     rule writeback((stage == Writeback) && memory.init.done);
-        $display("Writeback-----------------------------------------------------------------------------------------");
         // Get the data from execute
         Exec2Writeback last = e2w.first();
-        $display("e2w.first: ", fshow(last));
         e2w.deq();
 
         // Set Z.  2 because is left-shifted 1.
@@ -334,10 +314,8 @@ module mkAGC(AGC);
     endrule
 
     rule writebackDivide((stage == WritebackDivide) && memory.init.done);
-        $display("WritebackDivide-----------------------------------------------------------------------------------");
         // Get the data from execute - we really only need z
         Exec2Writeback last = e2w.first();
-        $display("e2w.first: ", fshow(last));
         e2w.deq();
 
         // Get the data back from divide
@@ -363,7 +341,6 @@ module mkAGC(AGC);
             endmethod
 
             method Action hostToAGC(IOPacket packet) if ((stage != Init) && memory.init.done);
-                $display("IO Host to AGC: ", packet);
                 if ((packet.channel == 13) || (packet.channel == 26)) begin
                     dskyInterrupt <= True;
                 end
@@ -377,7 +354,6 @@ module mkAGC(AGC);
     endinterface
 
     method Action start(Addr startZ) if ((stage == Init) && memory.init.done);
-        $display("Called start!");
         memory.imem.setZ({0, startZ, 1'b0});
         stage <= Fetch;
     endmethod

@@ -109,7 +109,6 @@ module mkSimHarness ();
     endrule
 
     rule doInitMem((currentCommand() == InitMem) && (readBufLoc == 5));
-        $display("[Harness] Passing InitLoad to AGC");
         agc.memInit.request.put(tagged InitLoad MemInitLoad{
             addr: {readBuf[1], readBuf[2]},
             data: {readBuf[3], readBuf[4]}
@@ -118,25 +117,21 @@ module mkSimHarness ();
     endrule
 
     rule doInitIO((currentCommand() == InitIO) && (readBufLoc == 4));
-        $display("[Harness] Passing InitIO to AGC");
         agc.hostIO.init(ioPacketFromBuffer());
         readBufLoc <= 0;
     endrule
 
     rule doInitDone((currentCommand() == InitDone) && (readBufLoc == 1));
-        $display("[Harness] Passing InitDone to AGC");
         agc.memInit.request.put(InitDone);
         readBufLoc <= 0;
     endrule
 
     rule doStart((currentCommand() == Start) && (readBufLoc == 3));
-        $display("[Harness] Passing Start to AGC");
         agc.start({truncate(readBuf[1]), readBuf[2]});
         readBufLoc <= 0;
     endrule
 
     rule doHostToAGC((currentCommand() == HostToAGC) && (readBufLoc == 4));
-        $display("[Harness] Passing HostToAGC to AGC");
         agc.hostIO.hostIO.hostToAGC(ioPacketFromBuffer());
         readBufLoc <= 0;
     endrule
@@ -145,7 +140,6 @@ module mkSimHarness ();
     // ready to be written to (ie, not currently being sent
     rule doAGCToHost(!isValid(writeBufLoc));
         IOPacket packet <- agc.hostIO.hostIO.agcToHost();
-        $display("[Harness] Got AGCToHostPacket");
 
         // Write the packet to the buffer, and mark the buffer as ready to be read
         Bit#(8) command = extend(pack(AGCToHost));

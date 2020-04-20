@@ -1,3 +1,4 @@
+
 import BRAM::*;
 import Vector::*;
 
@@ -23,6 +24,12 @@ typedef TLog#(FBankWords) LFBankWords;
 // Real memory layout
 typedef TMul#(EBanks, EBankWords) FBankStart;
 
+// Cycles per 1 ms.  On my Toshiba laptop in simulation it comes out to about 350.  Should figure out a better way of estimating this (perhaps a demo program),
+// and how to get the clock timing in FPGAs.
+typedef 350 TICKS_PER_MS;
+// Cycles per 500 us (useful to get the 7.5ms).
+typedef TDiv#(TICKS_PER_MS, 2) TICKS_PER_500US;
+
 (* synthesize *)
 // This is basically an MMU
 module mkAGCMemory(AGCMemory);
@@ -42,22 +49,28 @@ module mkAGCMemory(AGCMemory);
     Vector#(NRegs, Ehr#(5, Word)) regFile <- replicateM(mkEhr(0));
     Reg#(Bool) superbankBit <- mkReg(False);
 
-    Reg#(Bit#(19)) masterTimer <- mkReg(0);
+    // Start this at 1 to skip the initial T3 increment so its first fire is 10ms after startup.
+    Reg#(Bit#(19)) masterTimer <- mkReg(1);
     Reg#(Bool) t3IRUPT <- mkReg(False);
     Reg#(Bool) t4IRUPT <- mkReg(False);
+    Reg#(Bool) downrupt <- mkReg(False);
 
     // HACK: Write ports need to be first to keep pipeline FIFO's happy, and we know
     // iMemWrapper is never going to be used to write except for writeZImm,
     MemAndRegWrapper iMemWrapper <- mkMemAndRegWrapper(bram.portA, regFile, 1, 0, 0, 0);
     MemAndRegWrapper dMemWrapper <- mkMemAndRegWrapper(bram.portA, regFile, 3, 1 /*not actually used*/, 1, 2);
 
+    // Trigger timers when necessary.  One cycle of masterTimer takes 10 ms.  T3 and T4 are *incremented* every 10ms,
+    // with T4 canonically incrementing 7.5ms after T3, (and fire when overflowed, but software usually resets them very close to
+    // the overflow point to get a faster fire).  DOWNRUPT *fires* every 20ms.  This loop takes 20ms, so we increment T3
+    // at 0 and 10ms, increment T4 at 7.5ms and 17.5ms, and fire DOWNRUPT at 14ms.  There's no guidance for when exactly DOWNRUPT fires
+    // so we've chosen 14 to do our best to space things out.
     rule tick(memInit.done);
         Bit#(19) newTime = masterTimer + 1;
-        `ifdef SIM
-            if (newTime == 79) begin
-        `else
-            if (newTime == 250000) begin
-        `endif
+        if ((masterTimer == 0) ||
+            (masterTimer == fromInteger(valueOf(TMul#(10, TICKS_PER_MS))))) begin
+            // 0ms and 10ms: Fire T3
+
             Bit#(15) newVal = addOnesUncorrected(regFile[rTIME3][4][15:1], zeroExtend(1'b1));
             // Ie, overflowed into negatives
             if (newVal == {1'b1, 0}) begin
@@ -65,11 +78,10 @@ module mkAGCMemory(AGCMemory);
                 newVal = 0;
             end
             regFile[rTIME3][4] <= {newVal, 1'b0};
-        `ifdef SIM
-            end else if (newTime == 158) begin
-        `else
-            end else if (newTime == 500000) begin
-        `endif
+        end else if ((masterTimer == fromInteger(valueOf(TAdd#(TMul#(7, TICKS_PER_MS), TICKS_PER_500US)))) ||
+                     (masterTimer == fromInteger(valueOf(TAdd#(TMul#(17, TICKS_PER_MS), TICKS_PER_500US))))) begin
+            // 7.5ms and 17.5ms: Fire T4
+
             Bit#(15) newVal = addOnesUncorrected(regFile[rTIME4][4][15:1], zeroExtend(1'b1));
             // Ie, overflowed into negatives
             if (newVal == {1'b1, 0}) begin
@@ -77,6 +89,12 @@ module mkAGCMemory(AGCMemory);
                 newVal = 0;
             end
             regFile[rTIME4][4] <= {newVal, 1'b0};
+        end else if (masterTimer == fromInteger(valueOf(TMul#(14, TICKS_PER_MS)))) begin
+            // 1/2: Fire DOWNRUPT every 2 cycles.
+
+            downrupt <= True;
+        end else if (masterTimer == fromInteger(valueOf(TMul#(20, TICKS_PER_MS)))) begin
+            // 20ms: Reset the loop
 
             newTime = 0;
         end
@@ -195,7 +213,6 @@ module mkAGCMemory(AGCMemory);
 
     interface SuperbankProvider superbank;
         method Action set(Word data) if (memInit.done);
-            $display("Setting the superbank to %s", (data[7] == 1) ? "true" : "false");
             superbankBit <= (data[7] == 1);
         endmethod
 
@@ -219,6 +236,14 @@ module mkAGCMemory(AGCMemory);
 
         method Action clearT4IRUPT() if (memInit.done);
             t4IRUPT <= False;
+        endmethod
+
+        method Bool downrupt() if (memInit.done);
+            return downrupt;
+        endmethod
+
+        method Action clearDOWNRUPT() if (memInit.done);
+            downrupt <= False;
         endmethod
     endinterface
 
