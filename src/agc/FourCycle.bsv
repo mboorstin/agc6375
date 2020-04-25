@@ -335,7 +335,8 @@ module mkAGC(AGC);
             endmethod
 
             method Action hostToAGC(IOPacket packet) if ((stage != Init) && memory.init.done);
-                if ((packet.channel == 13) || (packet.channel == 26)) begin
+                // Only trigger an interrupt on actual data, rather than mask settings.
+                if (!packet.u && ((packet.channel == 13) || (packet.channel == 26))) begin
                     dskyInterrupt <= True;
                 end
                 io.hostIO.hostToAGC(packet);
