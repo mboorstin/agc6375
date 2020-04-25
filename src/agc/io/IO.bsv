@@ -50,6 +50,10 @@ module mkAGCIO(DMemoryFetcher fetcher, DMemoryStorer storer, SuperbankProvider s
     endinterface
 
     interface InternalIO internalIO;
+        method Word readImm(IOChannel channel) if (init.done);
+            return ioBuffer[channel];
+        endmethod
+
         method Action readReq(IOChannel channel) if (init.done);
             Bool lOrQ = is16BitChannel(channel);
             if (lOrQ) begin

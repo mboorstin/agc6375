@@ -40,15 +40,9 @@ interface SuperbankProvider;
 endinterface
 
 // An interface for handling timers
-interface TimerProvider;
-    method Bool t3IRUPT();
-    method Action clearT3IRUPT();
-    method Bool t4IRUPT();
-    method Action clearT4IRUPT();
-    method Bool t5IRUPT();
-    method Action clearT5IRUPT();
-    method Bool downrupt();
-    method Action clearDOWNRUPT();
+interface AGCTimers;
+    method Bool interruptNeeded(Interrupt interrupt);
+    method Action clearInterrupt(Interrupt interrupt);
 endinterface
 
 interface AGCMemory;
@@ -56,14 +50,18 @@ interface AGCMemory;
     interface DMemoryFetcher fetcher;
     interface DMemoryStorer storer;
     interface SuperbankProvider superbank;
-    interface TimerProvider timers;
     interface MemInitIfc init;
 endinterface
 
 interface InternalIO;
+    // Read directly (immediately) from the internal I/O buffer.
+    method Word readImm(IOChannel channel);
+
+    // Request a read and fetch its response a cycle later
     method Action readReq(IOChannel channel);
     method ActionValue#(Word) readResp();
 
+    // Write
     method Action write(IOChannel channel, Word data);
 endinterface
 

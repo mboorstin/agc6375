@@ -1,10 +1,12 @@
+import Fifo::*;
+
 import AGCMemory::*;
 import ArithUtil::*;
 import Decode::*;
 import Exec::*;
-import Fifo::*;
 import InterStage::*;
 import IO::*;
+import Timers::*;
 import TopLevelIfaces::*;
 import Types::*;
 
@@ -25,6 +27,7 @@ module mkAGC(AGC);
     // General state
     AGCMemory memory <- mkAGCMemory();
     AGCIO io <- mkAGCIO(memory.fetcher, memory.storer, memory.superbank, memory.init);
+    AGCTimers timers <- mkAGCTimers();
 
     // Stage management
     Reg#(Stage) stage <- mkReg(Init);
@@ -92,21 +95,21 @@ module mkAGC(AGC);
 
         if (!inISR && !hasOverflows && !isExtended && interruptsEnabled && !isValid(indexAddend) && (last.z != 'O4000) && (last.z != 'O4001)) begin
 
-            if (memory.timers.t5IRUPT) begin
+            if (timers.interruptNeeded(T5RUPT)) begin
                 isrAddr = tagged Valid 'O4011;
-                memory.timers.clearT5IRUPT();
-            end else if (memory.timers.t3IRUPT) begin
+                timers.clearInterrupt(T5RUPT);
+            end else if (timers.interruptNeeded(T3RUPT)) begin
                 isrAddr = tagged Valid 'O4015;
-                memory.timers.clearT3IRUPT();
-            end else if (memory.timers.t4IRUPT) begin
+                timers.clearInterrupt(T3RUPT);
+            end else if (timers.interruptNeeded(T4RUPT)) begin
                 isrAddr = tagged Valid 'O4021;
-                memory.timers.clearT4IRUPT();
+                timers.clearInterrupt(T4RUPT);
             end else if (dskyInterrupt) begin
                 isrAddr = tagged Valid 'O4025;
                 dskyInterrupt <= False;
-            end else if (memory.timers.downrupt) begin
+            end else if (timers.interruptNeeded(DOWNRUPT)) begin
                 isrAddr = tagged Valid 'O4041;
-                memory.timers.clearDOWNRUPT();
+                timers.clearInterrupt(DOWNRUPT);
             end
         end
 

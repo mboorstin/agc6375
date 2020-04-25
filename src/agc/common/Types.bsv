@@ -282,3 +282,13 @@ endfunction
 function Bool isDoubleWrite(InstNum inst);
     return (isDoubleInst(inst) || (inst == MP));
 endfunction
+
+
+// An enum of interrupts.  The values do not have any correlation to the real AGC.
+typedef enum {
+    T3RUPT,
+    T4RUPT,
+    T5RUPT,
+    T6RUPT,
+    DOWNRUPT
+} Interrupt deriving (Eq, Bits, FShow);

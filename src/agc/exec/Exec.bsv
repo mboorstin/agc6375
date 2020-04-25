@@ -295,27 +295,6 @@ function Exec2Writeback cs(ExecFuncArgs args);
     };
 endfunction
 
-// Diminish
-// The "Diminish" instruction decrements a positive non-zero value in an
-// erasable-memory location in-place, or increments a negative non-zero value.
-// It's difficult to get this to share hardware with AUG because of the differing
-// handling of +/- 0.  Code-wise, Bluespec doesn't allow function pointers, so it's
-// not really worth the overhead of combining aug and dim.
-// Parameterized helper function
-function Bit#(n) subOrAddNonZero(Bit#(n) val)
-        provisos(Add#(1, a__, n),
-            Add#(a__, b__, TAdd#(n, 1)),
-            Add#(c__, a__, TAdd#(n,2))
-            );
-    if ((val == 0) || (val == ~0)) begin
-        return val;
-    end else if (val[valueOf(TSub#(n, 1))] == 0) begin
-        return subOnesUncorrected(val, 1);
-    end else begin
-        return addOnesUncorrected(val, 1);
-    end
-endfunction
-
 // Double add to storage
 // The "Double Add to Storage" instruction does a double-precision (DP) add of
 // the A,L register pair to a pair of variables in erasable memory.
