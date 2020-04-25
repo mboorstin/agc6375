@@ -424,9 +424,6 @@ module mkDivider(Divider);
             quo <= (quo << 1) + 1; //the answer for this bit is 1
         end
 
-        $display("Step Dividend: ", displayDecimal(dividend));
-
-
         //increment stage; the next time this rule is executed,
         //shift_div will be one to the right.
         //will eventually wrap around to 31, which signals that the division is done.
@@ -456,12 +453,11 @@ module mkDivider(Divider);
         //extract information
         DP a_cons = makeConsistentSign(a);
         Fmt a_cons_fmt = $format("(") + displayDecimal(a_cons[29:15]) + $format(",    ") + displayDecimal(a_cons[14:0]) + $format(")");
-        $display(a_cons_fmt, $format(" / "), displayDecimal(b));
 
         Bit#(1) sign_a = truncateLSB(a_cons); //input signs
         Bit#(1) sign_b = truncateLSB(b);
         sign_q <= (sign_a == sign_b) ? (0) : (1); //output signs
-        
+
 
         //unsigned a and b magnitudes
         //these have a leading zero (positive)
@@ -471,7 +467,6 @@ module mkDivider(Divider);
         //check for special cases
         //special cases are ready for output immediately.
         if ({u_b, 14'b0} < u_a) begin
-            //$display("Divider: would return a quotient > 1.");
             //return dummy value
             stage <= 5'd30;
             quo <= 14'd12;
@@ -505,7 +500,6 @@ module mkDivider(Divider);
         SP quotient =  (sign_q == 0) ? {1'b0, quo} : {1'b1, ~quo};
         SP remainder = (sign_r == 0) ? {1'b0, rem} : {1'b1, ~rem};
 
-        $display(displayDecimal(quotient), $format(" , "), displayDecimal(remainder));
         //set stage to wait for input
         stage <= 5'd29;
 
