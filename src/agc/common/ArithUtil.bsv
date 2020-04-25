@@ -139,6 +139,22 @@ function Bit#(n) modularSubtract(Bit#(n) a, Bit#(n) b)
     return result;
 endfunction
 
+// This function appears in a few places (namely DINC and DIM).  If val == +/-0, leave
+// it as is; if it's > 0 then subtract 1; if its < = then add 1.
+function Bit#(n) subOrAddNonZero(Bit#(n) val)
+        provisos(Add#(1, a__, n),
+            Add#(a__, b__, TAdd#(n, 1)),
+            Add#(c__, a__, TAdd#(n,2))
+            );
+    if ((val == 0) || (val == ~0)) begin
+        return val;
+    end else if (val[valueOf(TSub#(n, 1))] == 0) begin
+        return subOnesUncorrected(val, 1);
+    end else begin
+        return addOnesUncorrected(val, 1);
+    end
+endfunction
+
 //multiplication
 //a * b is returned.
 //functions by converting to 2's complement and multiplying.

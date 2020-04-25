@@ -1,10 +1,12 @@
+import Fifo::*;
+
 import AGCMemory::*;
 import ArithUtil::*;
 import Decode::*;
 import Exec::*;
-import Fifo::*;
 import InterStage::*;
 import IO::*;
+import Timers::*;
 import TopLevelIfaces::*;
 import Types::*;
 
@@ -25,6 +27,7 @@ module mkAGC(AGC);
     // General state
     AGCMemory memory <- mkAGCMemory();
     AGCIO io <- mkAGCIO(memory.fetcher, memory.storer, memory.superbank, memory.init);
+    AGCTimers timers <- mkAGCTimers(memory.regPort, io.internalIO, memory.init);
 
     // Stage management
     Reg#(Stage) stage <- mkReg(Init);
@@ -92,21 +95,25 @@ module mkAGC(AGC);
 
         if (!inISR && !hasOverflows && !isExtended && interruptsEnabled && !isValid(indexAddend) && (last.z != 'O4000) && (last.z != 'O4001)) begin
 
-            if (memory.timers.t5IRUPT) begin
+            // TODO: Clean this up
+            if (timers.interruptNeeded(ruptT6)) begin
+                isrAddr = tagged Valid 'O4005;
+                timers.clearInterrupt(ruptT6);
+            end else if (timers.interruptNeeded(ruptT5)) begin
                 isrAddr = tagged Valid 'O4011;
-                memory.timers.clearT5IRUPT();
-            end else if (memory.timers.t3IRUPT) begin
+                timers.clearInterrupt(ruptT5);
+            end else if (timers.interruptNeeded(ruptT3)) begin
                 isrAddr = tagged Valid 'O4015;
-                memory.timers.clearT3IRUPT();
-            end else if (memory.timers.t4IRUPT) begin
+                timers.clearInterrupt(ruptT3);
+            end else if (timers.interruptNeeded(ruptT4)) begin
                 isrAddr = tagged Valid 'O4021;
-                memory.timers.clearT4IRUPT();
+                timers.clearInterrupt(ruptT4);
             end else if (dskyInterrupt) begin
                 isrAddr = tagged Valid 'O4025;
                 dskyInterrupt <= False;
-            end else if (memory.timers.downrupt) begin
+            end else if (timers.interruptNeeded(ruptDown)) begin
                 isrAddr = tagged Valid 'O4041;
-                memory.timers.clearDOWNRUPT();
+                timers.clearInterrupt(ruptDown);
             end
         end
 
@@ -335,7 +342,8 @@ module mkAGC(AGC);
             endmethod
 
             method Action hostToAGC(IOPacket packet) if ((stage != Init) && memory.init.done);
-                if ((packet.channel == 13) || (packet.channel == 26)) begin
+                // Only trigger an interrupt on actual data, rather than mask settings.
+                if (!packet.u && ((packet.channel == 13) || (packet.channel == 26))) begin
                     dskyInterrupt <= True;
                 end
                 io.hostIO.hostToAGC(packet);

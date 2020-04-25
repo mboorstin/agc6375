@@ -18,7 +18,7 @@ DIR_SOURCE=src
 BSV_FLAGS=-sim -keep-fires -aggressive-conditions -show-range-conflict
 # List of modules to compile, separated by :
 # TODO: Autogenerate these lists
-BSV_MODULES_COMMON=agc:agc/common:agc/decode:agc/exec:agc/includes:agc/io:agc/memory
+BSV_MODULES_COMMON=agc:agc/common:agc/decode:agc/exec:agc/includes:agc/io:agc/memory:agc/timers
 BSV_MODULES_SIM=harness/sim/vendor/BlueBasics:harness/sim/vendor/CharIO
 # Symlink for program to load (see discussion in AGCMemory.bsv)
 BSV_PROGRAM_PATH=$(DIR_BUILD)/program

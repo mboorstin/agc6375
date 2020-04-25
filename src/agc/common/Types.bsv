@@ -75,7 +75,8 @@ typedef 49 NRegs;
 typedef TLog#(NRegs) LNRegs;
 typedef Bit#(LNRegs) RegIdx;
 
-// Registers
+// Registers.  enums are difficult to work (they require constant packing / unpacking, and there's no size()
+// method to create a register to hold them) so we do it manually.
 RegIdx rA = 0;
 RegIdx rL = 1;
 RegIdx rQ = 2;
@@ -282,3 +283,16 @@ endfunction
 function Bool isDoubleWrite(InstNum inst);
     return (isDoubleInst(inst) || (inst == MP));
 endfunction
+
+
+// A list of interrupts.  As for registers, we don't make this an enum since it's difficult
+// to work with for indexing.
+typedef 5 NInterrupts;
+typedef TLog#(NInterrupts) LNInterrupts;
+typedef Bit#(LNInterrupts) InterruptIdx;
+
+InterruptIdx ruptT3 = 0;
+InterruptIdx ruptT4 = 1;
+InterruptIdx ruptT5 = 2;
+InterruptIdx ruptT6 = 3;
+InterruptIdx ruptDown = 4;
