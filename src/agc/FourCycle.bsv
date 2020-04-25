@@ -27,7 +27,7 @@ module mkAGC(AGC);
     // General state
     AGCMemory memory <- mkAGCMemory();
     AGCIO io <- mkAGCIO(memory.fetcher, memory.storer, memory.superbank, memory.init);
-    AGCTimers timers <- mkAGCTimers();
+    AGCTimers timers <- mkAGCTimers(memory.regPort, io.internalIO, memory.init);
 
     // Stage management
     Reg#(Stage) stage <- mkReg(Init);
@@ -95,21 +95,26 @@ module mkAGC(AGC);
 
         if (!inISR && !hasOverflows && !isExtended && interruptsEnabled && !isValid(indexAddend) && (last.z != 'O4000) && (last.z != 'O4001)) begin
 
-            if (timers.interruptNeeded(T5RUPT)) begin
+            // TODO: Clean this up
+            if (timers.interruptNeeded(ruptT6)) begin
+                $display("T6 fired");
+                isrAddr = tagged Valid 'O4005;
+                timers.clearInterrupt(ruptT6);
+            end else if (timers.interruptNeeded(ruptT5)) begin
                 isrAddr = tagged Valid 'O4011;
-                timers.clearInterrupt(T5RUPT);
-            end else if (timers.interruptNeeded(T3RUPT)) begin
+                timers.clearInterrupt(ruptT5);
+            end else if (timers.interruptNeeded(ruptT3)) begin
                 isrAddr = tagged Valid 'O4015;
-                timers.clearInterrupt(T3RUPT);
-            end else if (timers.interruptNeeded(T4RUPT)) begin
+                timers.clearInterrupt(ruptT3);
+            end else if (timers.interruptNeeded(ruptT4)) begin
                 isrAddr = tagged Valid 'O4021;
-                timers.clearInterrupt(T4RUPT);
+                timers.clearInterrupt(ruptT4);
             end else if (dskyInterrupt) begin
                 isrAddr = tagged Valid 'O4025;
                 dskyInterrupt <= False;
-            end else if (timers.interruptNeeded(DOWNRUPT)) begin
+            end else if (timers.interruptNeeded(ruptDown)) begin
                 isrAddr = tagged Valid 'O4041;
-                timers.clearInterrupt(DOWNRUPT);
+                timers.clearInterrupt(ruptDown);
             end
         end
 

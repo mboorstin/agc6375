@@ -1,3 +1,5 @@
+import Vector::*;
+
 import Types::*;
 
 // Memory-related
@@ -41,14 +43,23 @@ endinterface
 
 // An interface for handling timers
 interface AGCTimers;
-    method Bool interruptNeeded(Interrupt interrupt);
-    method Action clearInterrupt(Interrupt interrupt);
+    method Bool interruptNeeded(InterruptIdx interrupt);
+    method Action clearInterrupt(InterruptIdx interrupt);
 endinterface
+
+// It would be nice to expose this as an interface with get() and set() methods.  It's
+// difficult to do that because we want to be able to call the set() method multiple times
+// per cycle on different registers, and Bluespec doesn't allow calling a method multiple times.
+// I also can't find an (elegant) way to parameterize method definition for interfaces.  So,
+// we just expose the Vector#(Reg) directly.
+// Note that we may eventually want to change this to a Vector#(Vector#()) to expose multiple ports.
+typedef Vector#(NRegs, Reg#(Word)) RegisterPort;
 
 interface AGCMemory;
     interface IMemory imem;
     interface DMemoryFetcher fetcher;
     interface DMemoryStorer storer;
+    interface RegisterPort regPort;
     interface SuperbankProvider superbank;
     interface MemInitIfc init;
 endinterface

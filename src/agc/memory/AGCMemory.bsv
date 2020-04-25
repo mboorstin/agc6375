@@ -159,6 +159,9 @@ module mkAGCMemory(AGCMemory);
         endmethod
     endinterface
 
+    // We've used EHR ports 0 - 3 for imem and dmem, so the direct access gets port 4.
+    interface RegisterPort regPort = transpose(regFile)[4];
+
     interface SuperbankProvider superbank;
         method Action set(Word data) if (memInit.done);
             superbankBit <= (data[7] == 1);

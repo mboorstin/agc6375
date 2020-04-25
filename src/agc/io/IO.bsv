@@ -83,6 +83,9 @@ module mkAGCIO(DMemoryFetcher fetcher, DMemoryStorer storer, SuperbankProvider s
             end else if (channel == 7) begin
                 superbank.set(data);
             end else begin
+                if (channel == 'O13) begin
+                    $display("Writting channel o%o with data o%o", channel, data);
+                end
                 agcToHostQ.enq(IOPacket{channel: channel, data: {1'b0, data[15:1]}, u: False});
                 ioBuffer[channel] <= data;
             end
