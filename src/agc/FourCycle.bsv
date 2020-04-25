@@ -61,7 +61,8 @@ module mkAGC(AGC);
         // Get the actual address out of Z.  Z always holds the next address.
         // TAGLSB
         Addr zAddr = z[12:1];
-        Addr zAddrToFetch = subOnesCorrected(zAddr, 1);
+        // subOnesCorrected(1, 1) rolls over to 7777, but in this case we actually just want 0.
+        Addr zAddrToFetch = (zAddr == 1) ? 0 : subOnesCorrected(zAddr, 1);
 
         // Fire the load request
         memory.imem.req(zAddrToFetch);
@@ -151,7 +152,8 @@ module mkAGC(AGC);
                 isExtended <= False;
             end
 
-            if (decoded.instNum == INHINT) begin
+            // TODO: For EDRUPT, do we want to set interruptsEnabled = False, or inISR = true, or both?
+            if ((decoded.instNum == EDRUPT) || (decoded.instNum == INHINT)) begin
                 interruptsEnabled <= False;
             end else if (decoded.instNum == RELINT) begin
                 interruptsEnabled <= True;
@@ -174,12 +176,7 @@ module mkAGC(AGC);
             end else begin
                 // Notify execute
                 d2e.enq(d2eArgs);
-
-                if (decoded.instNum == EDRUPT) begin
-                    stage <= Finished;
-                end else begin
-                    stage <= Exec;
-                end
+                stage <= Exec;
             end
         end
 

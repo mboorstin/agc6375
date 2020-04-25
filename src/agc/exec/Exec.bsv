@@ -27,6 +27,7 @@ function Exec2Writeback exec(ExecFuncArgs args);
         DXCH: return dxch(args);
         DIM: return dim(args);
         DV: return dv(args);
+        EDRUPT: return edrupt(args);
         // Bunch of stuff here
         INCR: return incr(args);
         INDEX: return index(args);
@@ -510,6 +511,20 @@ function Exec2Writeback dv(ExecFuncArgs args);
         memAddrOrIOChannel: ?,
         regNum: ?,
         newZ: args.z + 1
+    };
+endfunction
+
+// EDRUPT
+// The "EDRUPT" instruction is a special kind of interrupt which inhibits interrupts, loads
+// Z into ZRUPT, and takes the next instruction from address 0.
+function Exec2Writeback edrupt(ExecFuncArgs args);
+    return Exec2Writeback {
+        eRes1: ?,
+        eRes2: {?, args.z},
+        memAddrOrIOChannel: ?,
+        regNum: tagged Valid rZRUPT,
+        // We want the next instruction to be 0, so this needs to be one more than that
+        newZ: 1
     };
 endfunction
 
