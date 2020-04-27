@@ -48,8 +48,6 @@ module mkAGC(AGC);
     Reg#(Bool) inISR <- mkReg(False);
     Reg#(Bool) interruptsEnabled <- mkReg(True);
 
-    Reg#(Bool) dskyInterrupt <- mkReg(False);
-
     function Instruction handleIndex(Instruction inst);
         // This presumes INDEX corrects overflow - it's not actually specified as such but it's what
         // VirtualAGC does and it seems reasonable enough.
@@ -108,12 +106,15 @@ module mkAGC(AGC);
             end else if (timers.interruptNeeded(ruptT4)) begin
                 isrAddr = tagged Valid 'O4021;
                 timers.clearInterrupt(ruptT4);
-            end else if (dskyInterrupt) begin
+            end else if (io.internalIO.interruptNeeded(ruptDSKY)) begin
                 isrAddr = tagged Valid 'O4025;
-                dskyInterrupt <= False;
+                io.internalIO.clearInterrupt(ruptDSKY);
             end else if (timers.interruptNeeded(ruptDown)) begin
                 isrAddr = tagged Valid 'O4041;
                 timers.clearInterrupt(ruptDown);
+            end else if (io.internalIO.interruptNeeded(ruptHand)) begin
+                isrAddr = tagged Valid 'O4051;
+                io.internalIO.clearInterrupt(ruptHand);
             end
         end
 
@@ -342,10 +343,6 @@ module mkAGC(AGC);
             endmethod
 
             method Action hostToAGC(IOPacket packet) if ((stage != Init) && memory.init.done);
-                // Only trigger an interrupt on actual data, rather than mask settings.
-                if (!packet.u && ((packet.channel == 13) || (packet.channel == 26))) begin
-                    dskyInterrupt <= True;
-                end
                 io.hostIO.hostToAGC(packet);
             endmethod
         endinterface

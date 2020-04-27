@@ -7,7 +7,7 @@ import Types::*;
 // Cycles per 1 ms.  On my Toshiba laptop in simulation it comes out to about 350.  Should figure out a better way of estimating this (perhaps a demo program),
 // and how to get the clock timing in FPGAs.
 // TODO: Speed me back up
-typedef 350 TICKS_PER_MS;
+typedef 700 TICKS_PER_MS;
 // Cycles per 500 us (useful to get the 7.5ms).
 typedef TDiv#(TICKS_PER_MS, 2) TICKS_PER_500US;
 
@@ -15,7 +15,7 @@ module mkAGCTimers(RegisterPort regPort, InternalIO internalIO, MemInitIfc init,
 
     // Start this at 1 to skip the initial T3 increment so its first fire is 10ms after startup.
     Reg#(Bit#(19)) masterTimer <- mkReg(0);
-    Vector#(NInterrupts, Reg#(Bool)) interrupts <- replicateM(mkReg(False));
+    Vector#(NTimerInterrupts, Reg#(Bool)) interrupts <- replicateM(mkReg(False));
 
     // Trigger timers when necessary.  One cycle of masterTimer takes 10 ms.  T1, T3, T4, and T5 are *incremented* every 10ms.
     // T1 (and its associated T2) don't cause interrupts, so we can increment them at the same time as T3.
@@ -103,11 +103,11 @@ module mkAGCTimers(RegisterPort regPort, InternalIO internalIO, MemInitIfc init,
         end
     endrule
 
-    method Bool interruptNeeded(InterruptIdx interrupt);
+    method Bool interruptNeeded(TimerInterruptIdx interrupt);
         return interrupts[interrupt];
     endmethod
 
-    method Action clearInterrupt(InterruptIdx interrupt);
+    method Action clearInterrupt(TimerInterruptIdx interrupt);
         interrupts[interrupt] <= False;
     endmethod
 

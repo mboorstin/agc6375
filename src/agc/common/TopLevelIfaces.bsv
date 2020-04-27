@@ -43,8 +43,8 @@ endinterface
 
 // An interface for handling timers
 interface AGCTimers;
-    method Bool interruptNeeded(InterruptIdx interrupt);
-    method Action clearInterrupt(InterruptIdx interrupt);
+    method Bool interruptNeeded(TimerInterruptIdx interrupt);
+    method Action clearInterrupt(TimerInterruptIdx interrupt);
 endinterface
 
 // It would be nice to expose this as an interface with get() and set() methods.  It's
@@ -74,6 +74,10 @@ interface InternalIO;
 
     // Write
     method Action write(IOChannel channel, Word data);
+
+    // Interrupt handling
+    method Bool interruptNeeded(IOInterruptIdx interrupt);
+    method Action clearInterrupt(IOInterruptIdx interrupt);
 endinterface
 
 interface AGCIO;

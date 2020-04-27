@@ -113,9 +113,9 @@ RegIdx rOPTX = 30;
 RegIdx rPIPAX = 31;
 RegIdx rPIPAY = 32;
 RegIdx rPIPAZ = 33;
-RegIdx rQRHCCTR = 34;
-RegIdx rPRHCCTR = 35;
-RegIdx rRRHCCTR = 36;
+RegIdx rRHCP = 34;
+RegIdx rRHCY = 35;
+RegIdx rRHCR = 36;
 RegIdx rINLINK = 37;
 RegIdx rRNRAD = 38;
 RegIdx rGYROCTR = 39;
@@ -286,13 +286,22 @@ endfunction
 
 
 // A list of interrupts.  As for registers, we don't make this an enum since it's difficult
-// to work with for indexing.
-typedef 5 NInterrupts;
-typedef TLog#(NInterrupts) LNInterrupts;
-typedef Bit#(LNInterrupts) InterruptIdx;
+// to work with for indexing.  We have two different kinds of interrupts: interrupts from timers
+// (TimerInterrupts), and interrupts from I/O (IOInterrupts).   At some point we may want to refactor
+// this into a single interrupt handler and have some better system for queueing them.
+typedef 5 NTimerInterrupts;
+typedef TLog#(NTimerInterrupts) LNTimerInterrupts;
+typedef Bit#(LNTimerInterrupts) TimerInterruptIdx;
 
-InterruptIdx ruptT3 = 0;
-InterruptIdx ruptT4 = 1;
-InterruptIdx ruptT5 = 2;
-InterruptIdx ruptT6 = 3;
-InterruptIdx ruptDown = 4;
+TimerInterruptIdx ruptT3 = 0;
+TimerInterruptIdx ruptT4 = 1;
+TimerInterruptIdx ruptT5 = 2;
+TimerInterruptIdx ruptT6 = 3;
+TimerInterruptIdx ruptDown = 4;
+
+typedef 2 NIOInterrupts;
+typedef TLog#(NIOInterrupts) LNIOInterrupts;
+typedef Bit#(LNIOInterrupts) IOInterruptIdx;
+
+IOInterruptIdx ruptDSKY = 0;
+IOInterruptIdx ruptHand = 1;

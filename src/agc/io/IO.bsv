@@ -20,6 +20,11 @@ module mkAGCIO(DMemoryFetcher fetcher, DMemoryStorer storer, SuperbankProvider s
     Vector#(NIOChannels, Reg#(Word)) ioBuffer <- replicateM(mkReg(0));
     Vector#(NIOChannels, Reg#(IOMask)) ioMasks <- replicateM(mkReg(15'h7FFF));
 
+    // Keep track of the interrupts we need to throw
+    Vector#(NIOInterrupts, Reg#(Bool)) interrupts <- replicateM(mkReg(False));
+    // Whether or not the hand controller is in detent (needed for I/O channel 031)
+    Reg#(Bool) inDetent <- mkReg(True);
+
     // It's important to use a bypass FIFO here so requests
     // can go out ASAP
     // TODO: Might want to increase the size of this if SceMI turns
@@ -40,11 +45,34 @@ module mkAGCIO(DMemoryFetcher fetcher, DMemoryStorer storer, SuperbankProvider s
         // We don't need to worry about rL and rQ here because they're not
         // I/O channels so external things aren't allowed to write to them
         method Action hostToAGC(IOPacket packet);
+
             if (packet.u) begin
                 ioMasks[packet.channel] <= packet.data[14:0];
             end else begin
                 IOMask newVal = (ioBuffer[packet.channel][15:1] & ~ioMasks[packet.channel]) | packet.data[14:0];
                 ioBuffer[packet.channel] <= {newVal, 1'b0};
+
+                // Check for interrupts we need to throw
+                case (packet.channel)
+                    // DSKY (015) and thruster panel (032) use the same interrupt
+                    'O15: interrupts[ruptDSKY] <= True;
+                    'O31: begin
+                        // Only fire if transitioning from in detent to not in detent
+                        // Top bit is 0 if not in detent; 1 if in detent
+                        Bool newInDetent = unpack(packet.data[14]);
+                        if (inDetent && !newInDetent) begin
+                            $display("Firing ruptHand");
+                            interrupts[ruptHand] <= True;
+                        end
+                        inDetent <= newInDetent;
+                    end
+                    'O32: interrupts[ruptDSKY] <= True;
+                    // 166-170 are fake channels that VirtualAGC software uses to mimic the hand controller
+                    // TODO: Need to re-emit on an output channel?
+                    'O166: storer.memStore(zeroExtend(rRHCP), {packet.data[14:0], 1'b0});
+                    'O167: storer.memStore(zeroExtend(rRHCY), {packet.data[14:0], 1'b0});
+                    'O170: storer.memStore(zeroExtend(rRHCR), {packet.data[14:0], 1'b0});
+                endcase
             end
         endmethod
     endinterface
@@ -87,6 +115,13 @@ module mkAGCIO(DMemoryFetcher fetcher, DMemoryStorer storer, SuperbankProvider s
                 ioBuffer[channel] <= data;
             end
         endmethod
-    endinterface
 
+        method Bool interruptNeeded(IOInterruptIdx interrupt);
+            return interrupts[interrupt];
+        endmethod
+
+        method Action clearInterrupt(IOInterruptIdx interrupt);
+            interrupts[interrupt] <= False;
+        endmethod
+    endinterface
 endmodule
