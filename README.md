@@ -70,3 +70,5 @@ Major Todos
 
   - The Luminary self-checks fail on the first test.  The debugging info is that `V05N09E` gives a display of `1407/1102/0`, and `V05N08E` gives a display of `3411/66100/1`.  The Luminary documentation explains what these numbers mean, though I haven't investigated them.
   - Add HANDRUPT and associated interrupts and registers.  See branch `boorstin-handrupt` for progress.
+
+Problem: there's something wrong with the timers.  Adding *more* space to the cycle causese the fail at 64, 1.  Something weird about interrupt scheduling?
