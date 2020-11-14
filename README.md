@@ -70,3 +70,4 @@ Major Todos
 
   - The verification tests fail on test 64.01.  It seems to be something about T3 or T4 not firing on the expected schedule, because 551c364744347da1bc90eac0ad1ba515171e11a2 broke them.
   - The Luminary self-checks fail on the first test.  The debugging info is that `V05N09E` gives a display of `1407/1102/0`, and `V05N08E` gives a display of `3411/66100/1`.  The Luminary documentation explains what these numbers mean, though I haven't investigated them.
+  - Add HANDRUPT and associated interrupts and registers.  See branch `boorstin-handrupt` for progress.
