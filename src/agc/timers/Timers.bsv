@@ -4,17 +4,15 @@ import ArithUtil::*;
 import TopLevelIfaces::*;
 import Types::*;
 
-// Cycles per 1 ms.  On my Toshiba laptop in simulation it comes out to about 350.  Should figure out a better way of estimating this (perhaps a demo program),
+// Cycles per ms.  On my Toshiba laptop in simulation it comes out to about 79.  Should figure out a better way of estimating this (perhaps a demo program),
 // and how to get the clock timing in FPGAs.
-// TODO: Speed me back up
-typedef 350 TICKS_PER_MS;
-// Cycles per 500 us (useful to get the 7.5ms).
-typedef TDiv#(TICKS_PER_MS, 2) TICKS_PER_500US;
+// TODO: Try slowing waaaaaay down, to like 200, so the AGC gets more time to think.
+typedef 10000 TICKS_PER_5MS;
 
 module mkAGCTimers(RegisterPort regPort, InternalIO internalIO, MemInitIfc init, AGCTimers ifc);
 
-    // Start this at 1 to skip the initial T3 increment so its first fire is 10ms after startup.
-    Reg#(Bit#(19)) masterTimer <- mkReg(0);
+    // TODO: Change me back to 0?  Unclear.
+    Reg#(Bit#(19)) masterTimer <- mkReg(1);
     Vector#(NInterrupts, Reg#(Bool)) interrupts <- replicateM(mkReg(False));
 
     // Trigger timers when necessary.  One cycle of masterTimer takes 10 ms.  T1, T3, T4, and T5 are *incremented* every 10ms.
@@ -26,12 +24,15 @@ module mkAGCTimers(RegisterPort regPort, InternalIO internalIO, MemInitIfc init,
     // TODO: Make this logic more elegant and figure out how to templatize it
     rule tick(init.done);
         Bit#(19) newTime = masterTimer + 1;
-        if ((masterTimer == 0) ||
-            (masterTimer == fromInteger(valueOf(TMul#(10, TICKS_PER_MS))))) begin
-            // 0ms and 10ms: Increment T1 and T3
+
+        // TODO: Constantize all of this!
+
+        if (newTime == 0 || newTime == 160) begin
+            // 0ms and 10 ms: Increment T1 (and thus potentially T2), and T3
 
             // T1
             Bit#(15) newT1 = addOnesUncorrected(regPort[rTIME1][15:1], zeroExtend(1'b1));
+
             // Overflow, so increment T2
             if (newT1 == {1'b1, 0}) begin
                 newT1 = 0;
@@ -39,7 +40,6 @@ module mkAGCTimers(RegisterPort regPort, InternalIO internalIO, MemInitIfc init,
                 Word newT2 = {zeroExtend(addOnesUncorrected(regPort[rTIME2][14:1], zeroExtend(1'b1))), 1'b0};
                 regPort[rTIME2] <= newT2;
             end
-            regPort[rTIME1] <= {newT1, 1'b0};
 
             // T3
             Bit#(15) newVal = addOnesUncorrected(regPort[rTIME3][15:1], zeroExtend(1'b1));
@@ -49,8 +49,7 @@ module mkAGCTimers(RegisterPort regPort, InternalIO internalIO, MemInitIfc init,
                 newVal = 0;
             end
             regPort[rTIME3] <= {newVal, 1'b0};
-        end else if ((masterTimer == fromInteger(valueOf(TAdd#(TMul#(7, TICKS_PER_MS), TICKS_PER_500US)))) ||
-                     (masterTimer == fromInteger(valueOf(TAdd#(TMul#(17, TICKS_PER_MS), TICKS_PER_500US))))) begin
+        end else if (newTime == 120 || newTime == 280) begin
             // 7.5ms and 17.5ms: Increment T4
 
             Bit#(15) newVal = addOnesUncorrected(regPort[rTIME4][15:1], zeroExtend(1'b1));
@@ -60,8 +59,7 @@ module mkAGCTimers(RegisterPort regPort, InternalIO internalIO, MemInitIfc init,
                 newVal = 0;
             end
             regPort[rTIME4] <= {newVal, 1'b0};
-        end else if ((masterTimer == fromInteger(valueOf(TMul#(5, TICKS_PER_MS)))) ||
-                     (masterTimer == fromInteger(valueOf(TMul#(15, TICKS_PER_MS))))) begin
+        end else if (newTime == 80 || newTime == 240) begin
             // 5ms and 15ms: Increment T5
 
             Bit#(15) newVal = addOnesUncorrected(regPort[rTIME5][15:1], zeroExtend(1'b1));
@@ -71,11 +69,11 @@ module mkAGCTimers(RegisterPort regPort, InternalIO internalIO, MemInitIfc init,
                 newVal = 0;
             end
             regPort[rTIME5] <= {newVal, 1'b0};
-        end else if (masterTimer == fromInteger(valueOf(TMul#(13, TICKS_PER_MS)))) begin
-            // 13: Fire Downrupt
+        end else if (newTime == 208) begin
+            // 13ms: Fire Downrupt
 
             interrupts[ruptDown] <= True;
-        end else if (masterTimer == fromInteger(valueOf(TMul#(20, TICKS_PER_MS)))) begin
+        end else if (newTime == 320) begin
             // 20ms: Reset the loop
 
             newTime = 0;
